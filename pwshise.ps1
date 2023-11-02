@@ -25,14 +25,23 @@ $proEdit = $true
 
 while ($option -eq "none") {
     $correct = $false
+    $preDir = $true
     
     if ($selected -eq $true) {
+        $dir = Split-Path -Path $fullPath -Parent
+        $name = Split-Path -Path $fullPath -Leaf
         if ($dir.EndsWith("\")) { $dir = $dir.Substring(0, $dir.Length - 1) }
         Write-Host "`nSelected file: $name`nDirectory: $dir"
     } # When $selected is set to true, it removes any extra backslashes from $dir and displays both the ($dir = directory :) and ($name = the file name)
 
     Write-Host "`nType a command or 'help' for a list of commands"
     $choice = Read-Host ">"; $choice = $choice.Trim()
+    $regex = "^\s*([^ ]+)\s*(.*)$" # The regular expression ^\s*([^ ]+)\s*(.*)$ matches any leading whitespace
+    if ($choice -match $regex) { 
+        $choice = $matches[1].ToLower()
+        $fullPath = $matches[2]
+        $regDep = $true
+    } # Splits the command and directory into two variables 
     Clear-Host
 
     switch ($choice) {
@@ -44,7 +53,7 @@ The Help Menu:
 
 help: List this menu
 new: Create a new Powershell script file
-open: Select an existing .ps1 as active
+open: Select an existing .ps1 as active | You can add a path after open <path>
 edit: It's prophesized to at least contain something
 booyeah
 
@@ -58,6 +67,19 @@ booyeah
         # Create a new .ps1 script file in any directory with any name. (Requires admin to create files in some locations)
         "new" {
             while ($true) {
+                while ($regDep -eq $true) {
+                    Write-Host "Do you want to make $fullPath`nas the designated file?`nY = Yes | N = No"
+                    $choose = [System.Console]::ReadKey().Key
+                    switch ($choose) {
+                        "Y" { 
+                            $preDir = $false
+                            $regDep = $false
+                        }
+                        "N" {
+                            $regdep = $false
+                        }
+                    }
+                }
                 Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
                 $dir = Read-Host ">"; $dir = $dir.Trim()
                 Clear-Host
@@ -97,8 +119,23 @@ booyeah
 
         # Direct the script to any available .ps1 scripts and it will assign itself to it
         "open" {
+            while ($regDep -eq $true) {
+                Write-Host "Do you want to select $fullPath`nas the designated file?`nY = Yes | N = No"
+                $choose = [System.Console]::ReadKey().Key
+                switch ($choose) {
+                    "Y" { 
+                        $preDir = $false
+                        $regDep = $false
+                    }
+                    "N" {
+                        $regdep = $false
+                    }
+                }
+            }
+            if ($preDir -eq $true) {
             Write-Host "`nPlease enter the directory of the powershell script you want to edit`nExample: C:\Users\$username\Desktop\whatImMaking.ps1`nIt must have a .ps1 extension"
             $fullPath = Read-Host ">"; $fullPath = $fullPath.Trim(); if ($fullPath.EndsWith("\")) { $fullPath = $fullPath.Substring(0, $fullPath.Length - 1) }
+            }
             if (![string]::IsNullOrEmpty($fullPath)) {
                 if (Test-Path $fullPath -PathType Leaf) {
                     $dir = Split-Path -Path $fullPath -Parent
@@ -186,13 +223,20 @@ Write-Host "Q: Quit without saving"
             }
         }
 
+        "fit" {
+            $fullpath = "C:\users\connorr\new.ps1"
+            $selected = $true
+            $correct = $true
+        }
+
         # ;)
         "booyeah" {
-        "Opening 300 instances of the calculator..."
-        Start-Sleep -Seconds 2
-        "jk"; Start-Sleep -Milliseconds 750; "jk"
-        Start-Sleep -Seconds 2
-        $option = "debug"
+            "Opening 300 instances of the calculator..."
+            Start-Sleep -Seconds 2
+            "jk"; Start-Sleep -Milliseconds 750; "jk"
+            Start-Sleep -Seconds 2
+            $option = "fibba"
+            $correct = $true
         }
     }
 
