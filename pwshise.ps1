@@ -6,10 +6,10 @@ if ($choose -ieq "a") {
     $choose = "none"
     break
 } elseif ($choose -ieq "b") {
-    $choose = "debug" 
+    $choose = "debug" # Could I have made this change $option? WhendidIask?
     break
 }}
-$option = "$choose" # This chooses which area of the script to start - "none" or "debug"
+$option = "$choose" # This chooses which area of the script to start - "none" or "debug" - This functionality will go away
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
@@ -235,8 +235,18 @@ Write-Host "Q: Quit without saving"
             Start-Sleep -Seconds 2
             "jk"; Start-Sleep -Milliseconds 750; "jk"
             Start-Sleep -Seconds 2
-            $option = "fibba"
             $correct = $true
+            while ($true) { 
+                Write-Host "Press A or B"
+                $choose = [System.Console]::ReadKey().Key
+                [System.Console]::Clear()
+                if ($choose -ieq "a") {
+                    $option = "debug"
+                    break
+                } elseif ($choose -ieq "b") {
+                    $option = "fibba" 
+                    break
+            } Clear-Host }
         }
     }
 
