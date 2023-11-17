@@ -20,7 +20,7 @@ $orig_fg_color = $host.UI.RawUI.ForegroundColor
 $selected = $false
 $name = $null
 $dir = $null
-$fullpath = $null
+$fullPath = $null
 $proEdit = $true
 
 while ($option -eq "none") {
@@ -224,7 +224,7 @@ Write-Host "Q: Quit without saving"
         }
 
         "fit" {
-            $fullpath = "C:\users\connorr\new.ps1"
+            $fullPath = "C:\users\connorr\new.ps1"
             $selected = $true
             $correct = $true
         }
@@ -344,4 +344,4 @@ Write-Host "Q: Quit without saving"
     Start-Sleep -Seconds 2
     Exit
   }
-} # little edit
+}
