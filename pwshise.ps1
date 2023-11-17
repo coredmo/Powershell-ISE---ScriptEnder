@@ -6,7 +6,7 @@ if ($choose -ieq "a") {
     $choose = "none"
     break
 } elseif ($choose -ieq "b") {
-    $choose = "debug" # Could I have made this change $option? WhendidIask?
+    $choose = "debug" # I could have made this change $option but I'm not
     break
 }}
 $option = "$choose" # This chooses which area of the script to start - "none" or "debug" - This functionality will go away
@@ -41,7 +41,7 @@ while ($option -eq "none") {
         $choice = $matches[1].ToLower()
         $fullPath = $matches[2]
         $regDep = $true
-    } # Splits the command and directory into two variables 
+    } # Splits the command and directory into two variables (THIS IS CAUSING COMMOTION)
     Clear-Host
 
     switch ($choice) {
@@ -158,6 +158,7 @@ booyeah
             $correct = $true
         }
 
+        "e" {"$fullPath"; Start-Sleep -Seconds 1}
         # Add descriptive information, create variables, and pre-made/custom script pieces using the inputted variables
         "edit" {
             if ($fullPath -ne $null) { 
@@ -192,8 +193,7 @@ Write-Host "Q: Quit without saving"
                         }
                     }
                     elseif ($key -eq "`r") {
-                         # Replace logic
-                         # You can add logic to replace text
+                         # Replace/edit logic
                     }
                     elseif ($key -eq "`enter") {
                         Set-Content -Path $filePath -Value $content
@@ -318,10 +318,9 @@ Write-Host "Q: Quit without saving"
         }
         elseif ($key -eq "`r") {
             # Replace logic
-            # You can add logic to replace text
         }
         elseif ($key -eq "`enter") {
-            Set-Content -Path $filePath -Value $content
+            Set-Content -Path $fullPath -Value $content
             Write-Host "Saved and exited."
             break
         }
@@ -343,5 +342,5 @@ Write-Host "Q: Quit without saving"
     Write-Host "No files are selected`nExiting..."
     Start-Sleep -Seconds 2
     Exit
-	} # little edit
+	}
 }
