@@ -282,7 +282,7 @@ while ($option -eq "fibba") {
     }
 
     Start-Sleep -Milliseconds 500
-} # C:\Users\connorr\OneDrive - Albert A. Webb Associates\Desktop
+}
 
 while ($option -eq "debug") {
     if ($fullPath -ne $null) { 
@@ -343,5 +343,5 @@ Write-Host "Q: Quit without saving"
     Write-Host "No files are selected`nExiting..."
     Start-Sleep -Seconds 2
     Exit
-  }
+	} # little edit
 }
