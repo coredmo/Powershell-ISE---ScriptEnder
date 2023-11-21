@@ -41,7 +41,7 @@ while ($option -eq "none") {
         $choice = $matches[1].ToLower()
         $fullPath = $matches[2]
         $regDep = $true
-    } # Splits the command and directory into two variables (THIS IS CAUSING COMMOTION)
+    } # Splits the command and directory into two variables (THIS IS CAUSING COMMOTION, EVERY CHOICE MATCHES REGEX)
     Clear-Host
 
     switch ($choice) {
