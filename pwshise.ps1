@@ -25,24 +25,42 @@ $proEdit = $true
 
 while ($option -eq "none") {
     $correct = $false
-    $preDir = $true
+    $preDir = $false
     
     if ($selected -eq $true) {
-        $dir = Split-Path -Path $fullPath -Parent
-        $name = Split-Path -Path $fullPath -Leaf
+        $dir = Split-Path -Path $dirInput -Parent
+        $name = Split-Path -Path $dirInput -Leaf
         if ($dir.EndsWith("\")) { $dir = $dir.Substring(0, $dir.Length - 1) }
         Write-Host "`nSelected file: $name`nDirectory: $dir"
     } # When $selected is set to true, it removes any extra backslashes from $dir and displays both the ($dir = directory :) and ($name = the file name)
 
     Write-Host "`nType a command or 'help' for a list of commands"
     $choice = Read-Host ">"; $choice = $choice.Trim()
-    $regex = "^\s*([^ ]+)\s*(.*)$" # The regular expression ^\s*([^ ]+)\s*(.*)$ matches any leading whitespace
-    if ($choice -match $regex) { 
-        $choice = $matches[1].ToLower()
-        $fullPath = $matches[2]
-        $regDep = $true
-    } # Splits the command and directory into two variables (THIS IS CAUSING COMMOTION, EVERY CHOICE MATCHES REGEX)
+
+    $tokens = $choice -split '\s+', 2
+    $choice = $tokens[0]
+    if ($tokens.Count -eq 2) {
+        $dirInit = $true
+        $dirPart = $tokens[1]
+        if (-not (Test-Path $dirPart -PathType Leaf)) {
+            $noArg = $true
+            $choice = $null
+            $dirInit = $false
+        } else {
+            $dirInput = $dirPart
+        }
+    } else {
+        $dirInit = $false
+    }
     Clear-Host
+    
+    if ($noArg -eq $true) { 
+    $host.UI.RawUI.ForegroundColor = "Red"
+    Write-Host "Invalid argument. You must provide a .ps1 file`nExample: open c:\users\$currentUser\test file\new.ps1." 
+    $host.UI.RawUI.ForegroundColor = $orig_fg_color 
+    $correct = $true
+    $noArg = $false
+    }
 
     switch ($choice) {
         # THE HELP MENU - Uses $correct to skip the "Input an actual command" error
@@ -67,7 +85,7 @@ booyeah
         # Create a new .ps1 script file in any directory with any name. (Requires admin to create files in some locations)
         "new" {
             while ($true) {
-                while ($regDep -eq $true) {
+                while ($dirInit -eq $true) {
                     Write-Host "Do you want to make $fullPath`nas the designated file?`nY = Yes | N = No"
                     $choose = [System.Console]::ReadKey().Key
                     switch ($choose) {
@@ -119,27 +137,27 @@ booyeah
 
         # Direct the script to any available .ps1 scripts and it will assign itself to it
         "open" {
-            while ($regDep -eq $true) {
-                Write-Host "Do you want to select $fullPath`nas the designated file?`nY = Yes | N = No"
+            while ($dirInit -eq $true) {
+                Write-Host "Do you want to select $dirInput`nas the designated file?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key
                 switch ($choose) {
                     "Y" { 
-                        $preDir = $false
-                        $regDep = $false
+                        $preDir = $true
+                        $dirInit = $false
                     }
                     "N" {
-                        $regdep = $false
+                        $dirInit = $false
                     }
                 }
             }
-            if ($preDir -eq $true) {
+            if ($preDir -eq $false) {
             Write-Host "`nPlease enter the directory of the powershell script you want to edit`nExample: C:\Users\$username\Desktop\whatImMaking.ps1`nIt must have a .ps1 extension"
-            $fullPath = Read-Host ">"; $fullPath = $fullPath.Trim(); if ($fullPath.EndsWith("\")) { $fullPath = $fullPath.Substring(0, $fullPath.Length - 1) }
+            $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim(); if ($dirInput.EndsWith("\")) { $dirInput = $dirInput.Substring(0, $dirInput.Length - 1) }
             }
-            if (![string]::IsNullOrEmpty($fullPath)) {
-                if (Test-Path $fullPath -PathType Leaf) {
-                    $dir = Split-Path -Path $fullPath -Parent
-                    $name = Split-Path -Path $fullPath -Leaf
+            if (![string]::IsNullOrEmpty($dirInput)) {
+                if (Test-Path $dirInput -PathType Leaf) {
+                    $dir = Split-Path -Path $dirInput -Parent
+                    $name = Split-Path -Path $dirInput -Leaf
                     Clear-Host
                     $selected = $true
                     $correct = $true
