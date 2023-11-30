@@ -1,15 +1,16 @@
 #The script to end scripting - Created by Connor :)
 
-while ($true) { $choose = [System.Console]::ReadKey().Key
-[System.Console]::Clear()
-if ($choose -ieq "a") {
-    $choose = "none"
-    break
-} elseif ($choose -ieq "b") {
-    $choose = "debug" # I could have made this change $option but I'm not
-    break
-}}
-$option = "$choose" # This chooses which area of the script to start - "none" or "debug" - This functionality will go away
+$validCmd = @('help','new','open','e','edit','fit','booyeah','this')
+
+while ($true) { $choose = [System.Console]::ReadKey().Key; [System.Console]::Clear()
+    if ($choose -ieq "a") {
+        $choose = "none"
+        break
+    } elseif ($choose -ieq "b") {
+        $choose = "debug" # I could have made this change $option but I'm not
+        break
+    }
+} $option = "$choose" # This chooses which area of the script to start - "none" or "debug" - This functionality will go away
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
@@ -39,29 +40,25 @@ while ($option -eq "none") {
     Write-Host "`nType a command or 'help' for a list of commands"
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
-
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
-    if ($tokens.Count -eq 2) {
-        $dirInit = $true
-        $dirPart = $tokens[1]
-        $this = [System.IO.Path]::IsPathRooted($dirPart); Write-host "$this";
-        if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
-        if ([System.IO.Path]::IsPathRooted($dirPart)) {
-        Write-Host "Test1"; Start-Sleep -Seconds 2
-            if (-not (Test-Path $dirPart -PathType Leaf)) {
-            Write-Host "Test2"; Start-Sleep -Seconds 2
-                $noArg = $true
-                $choice = $null
-                $dirInit = $false
-            } else {
-            Write-Host "Test3"; Start-Sleep -Seconds 2
-                $noArg = $false
-                $dirInput = $dirPart
+
+    if ($validCmd -contains $choice) {
+        if ($tokens.Count -eq 2) {
+            $dirInit = $true
+            $dirPart = $tokens[1]
+            $this = [System.IO.Path]::IsPathRooted($dirPart); Write-host "$this";
+            if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
+            if ([System.IO.Path]::IsPathRooted($dirPart)) {
+                if (-not (Test-Path $dirPart -PathType Leaf)) {
+                    $noArg = $true
+                    $choice = $null
+                    $dirInit = $false
+                } else {
+                    $dirInput = $dirPart
+                }
             }
-        }
-    } else {
-        $dirInit = $false
+        } else { $dirInit = $false }
     }
     Clear-Host
     
