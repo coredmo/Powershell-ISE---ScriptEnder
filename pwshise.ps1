@@ -20,12 +20,14 @@ $orig_fg_color = $host.UI.RawUI.ForegroundColor
 $selected = $false
 $name = $null
 $dir = $null
-$fullPath = $null
+$dirInput = $null
 $proEdit = $true
 
 while ($option -eq "none") {
     $correct = $false
     $preDir = $false
+    $isMade = $true
+    $noArg = $false
     
     if ($selected -eq $true) {
         $dir = Split-Path -Path $dirInput -Parent
@@ -37,24 +39,33 @@ while ($option -eq "none") {
     Write-Host "`nType a command or 'help' for a list of commands"
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
+
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     if ($tokens.Count -eq 2) {
         $dirInit = $true
         $dirPart = $tokens[1]
-        if (-not (Test-Path $dirPart -PathType Leaf)) {
-            $noArg = $true
-            $choice = $null
-            $dirInit = $false
-        } else {
-            $dirInput = $dirPart
+        $this = [System.IO.Path]::IsPathRooted($dirPart); Write-host "$this";
+        if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
+        if ([System.IO.Path]::IsPathRooted($dirPart)) {
+        Write-Host "Test1"; Start-Sleep -Seconds 2
+            if (-not (Test-Path $dirPart -PathType Leaf)) {
+            Write-Host "Test2"; Start-Sleep -Seconds 2
+                $noArg = $true
+                $choice = $null
+                $dirInit = $false
+            } else {
+            Write-Host "Test3"; Start-Sleep -Seconds 2
+                $noArg = $false
+                $dirInput = $dirPart
+            }
         }
     } else {
         $dirInit = $false
     }
     Clear-Host
     
-    if ($noArg -eq $true) { 
+    if ($noArg) { 
     $host.UI.RawUI.ForegroundColor = "Red"
     Write-Host "Invalid argument. You must provide a .ps1 file`nExample: open c:\users\$currentUser\test file\new.ps1." 
     $host.UI.RawUI.ForegroundColor = $orig_fg_color 
@@ -86,7 +97,7 @@ booyeah
         "new" {
             while ($true) {
                 while ($dirInit -eq $true) {
-                    Write-Host "Do you want to make $fullPath`nas the designated file?`nY = Yes | N = No"
+                    Write-Host "Do you want to make $dirInput`nas the designated file?`nY = Yes | N = No"
                     $choose = [System.Console]::ReadKey().Key
                     switch ($choose) {
                         "Y" { 
@@ -111,7 +122,7 @@ booyeah
                         try {
                             Write-Host "`n$currentdir\$name.ps1"
                             New-Item -Path "$currentdir\$name.ps1" -ItemType File -ErrorAction Stop
-                            $fullPath = "$currentdir\$name.ps1"
+                            $dirInput = "$currentdir\$name.ps1"
                             Write-Host "File successfully created."
                             $selected = $true
                             $correct = $true
@@ -176,12 +187,12 @@ booyeah
             $correct = $true
         }
 
-        "e" {"$fullPath"; Start-Sleep -Seconds 1}
+        "e" {"$dirInput $choice $dirPart"; Start-Sleep -Seconds 1}
         # Add descriptive information, create variables, and pre-made/custom script pieces using the inputted variables
         "edit" {
-            if ($fullPath -ne $null) { 
-                if (Test-Path $fullPath -PathType Leaf) {
-                    $content = Get-Content $fullPath
+            if ($dirInput -ne $null) { 
+                if (Test-Path $dirInput -PathType Leaf) {
+                    $content = Get-Content $dirInput
                     $cursorPosition = 0
 
                 while ($proEdit -eq $true) {
@@ -242,9 +253,26 @@ Write-Host "Q: Quit without saving"
         }
 
         "fit" {
-            $fullPath = "C:\users\connorr\new.ps1"
-            $selected = $true
-            $correct = $true
+            while ($isMade) {
+                Write-Host "Press a for a real file -11/29/2023-, press d for a fake one (for if the file no longer exists while selected)"
+                $fitChoice = [System.Console]::ReadKey().Key
+                [System.Console]::Clear()
+                switch ($fitChoice) {
+                    "a" {
+                        $dirInput = "C:\Users\connorr\t h\new.ps1\"
+                        $selected = $true
+                        $correct = $true
+                        $isMade = $false }
+                    "d" {
+                        $dirInput = "C:\users\connorr\new.ps1\"
+                        $selected = $true
+                        $correct = $true
+                        $isMade = $false }
+                }
+                Clear-Host
+                if ($dirInput.EndsWith("\")) { $dirInput = $dirInput.Substring(0, $dirInput.Length - 1) }
+                Test-Path $dirInput -PathType Leaf
+            }
         }
 
         # ;)
@@ -303,9 +331,9 @@ while ($option -eq "fibba") {
 }
 
 while ($option -eq "debug") {
-    if ($fullPath -ne $null) { 
-    if (Test-Path $fullPath -PathType Leaf) {
-    $content = Get-Content $fullPath
+    if ($dirInput -ne $null) { 
+    if (Test-Path $dirInput -PathType Leaf) {
+    $content = Get-Content $dirInput
     $cursorPosition = 0
 
     while ($true) {
@@ -338,7 +366,7 @@ Write-Host "Q: Quit without saving"
             # Replace logic
         }
         elseif ($key -eq "`enter") {
-            Set-Content -Path $fullPath -Value $content
+            Set-Content -Path $dirInput -Value $content
             Write-Host "Saved and exited."
             break
         }
