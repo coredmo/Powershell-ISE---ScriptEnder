@@ -31,6 +31,8 @@ while ($option -eq "none") {
     Write-Host "`nType a command or 'help' for a list of commands"
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
+    if ($choice -ieq "a command") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
+
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     # ^This will split something like "open C:\this.ps1" into "open" and "C:\this.ps1"
@@ -73,7 +75,7 @@ help: List this menu
 new: Create a new Powershell script file
 open: Select an existing .ps1 as active
 edit: It's prophesized to at least contain something
-booyeah
+booyeah:
 
 You can add a file path after a command
 Example: open C:\users\$username\my creation.ps1
@@ -285,7 +287,7 @@ Write-Host "Q: Quit without saving"
         # ;)
         "booyeah" {
             "Opening 300 instances of the calculator..."
-            Start-Sleep -Milliseconds 1800
+            Start-Sleep -Milliseconds 2000
             "jk"; Start-Sleep -Milliseconds 650; "jk"
             Start-Sleep -Milliseconds 1000
             $correct = $true
