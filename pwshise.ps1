@@ -34,18 +34,19 @@ while ($option -eq "none") {
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
     if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
+    if ($choice -ieq "new here" -or $choice -ieq "new h" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!" }
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
-    # ^This will split something like "open C:\this thing.ps1" into "open" and "C:\this thing.ps1"
-    # VThis will check if the input is a valid command and if so, make sure the extra part is a valid path to a script/directory.
-    if ($validCmd -contains $choice) {
+    # ^ This will split something like "open C:\this thing.ps1" into "open" and "C:\this thing.ps1"
+    # V This will check if the input is a valid command and if so, make sure the extra part is a valid path to a script/directory.
+    if ($validCmd -contains $choice -and -not $alrSelected -eq $true) {
         if ($tokens.Count -eq 2) {
             $dirPart = $tokens[1]
             if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
             if ([System.IO.Path]::IsPathRooted($dirPart)) {
                 $fileExtension = try { (Get-Item $dirPart -ErrorAction SilentlyContinue).Extension }
-                    catch { [System.IO.Path]::GetExtension($dirPart); "HAHA"; Start-Sleep -Seconds 8 }
+                    catch { [System.IO.Path]::GetExtension($dirPart); "Alt Mode"; Start-Sleep -Seconds 1 }
                 switch ($choice) {
                     "open" {
                         if ((Test-Path $dirPart -PathType Leaf) -and $fileExtension -eq '.ps1') {
@@ -56,7 +57,6 @@ while ($option -eq "none") {
                         }
                     }
                     "new" {
-                    "$fileExtension"; Start-Sleep -Seconds 2
                         if ($fileExtension -eq '.ps1') {
                             $dirInit = $true
                             $preName = $true
@@ -97,15 +97,19 @@ open: Select an existing .ps1 as active
 edit: It's prophesized to at least contain something
 booyeah:
 
-You can add a file path after a command
+You can add a file path after a command or create a new script in the current directory
 Example: open C:\users\$username\my creation.ps1
+Example: new here | new h
 
 (Debug) fit: fill dir
         e: check dir
 
+- Connor's Scripted ISE -
+https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 "@
             Write-Host "Press any key to return..."
-            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            $noid = Read-Host -Debug
+            if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" }
             Clear-Host
             $correct = $true
         }
@@ -120,8 +124,6 @@ Example: open C:\users\$username\my creation.ps1
                         $preDir = $true
                         $dirInit = $false
                         $dirInput = $dirPart
-                        $dir = Split-Path -Path $dirInput -Parent
-                        $name = Split-Path -Path $dirInput -Leaf
                     }
                     "N" {
                         $dirInit = $false
@@ -129,28 +131,32 @@ Example: open C:\users\$username\my creation.ps1
                 }
             }
 
-            if ($preDir -eq $false) {
+            if ($preDir -eq $false -and -not $alrSelected -eq $true) {
             Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
-            $dirPart = Read-Host ">"; $dirPart = $dirPart.Trim()
+            $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim()
             Clear-Host } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
 
-            if (![string]::IsNullOrEmpty($dirPart)) {
-                if ([System.IO.Path]::IsPathRooted($dirPart)) {
+            $dir = Split-Path -Path $dirInput -Parent -ErrorAction SilentlyContinue
+            $name = Split-Path -Path $dirInput -Leaf -ErrorAction SilentlyContinue
+
+            if (![string]::IsNullOrEmpty($dirInput)) {
+                if ([System.IO.Path]::IsPathRooted($dirInput)) {
 
                     if ($preName -eq $false) {
                     Write-Host "`nDirectory is compatible`nWhat is the name of your new script?"
                     $name = Read-Host ">"; $name.Trim() } else { $preLeaf = $true }
+                    $name = $name.Replace(".ps1","")
 
                     try {
-                        Write-Host "`n$dirPart\$name.ps1"
+                        Write-Host "`n$dir\$name.ps1"
                         try {
-                            New-Item -Path "$dir" -ItemType Directory -ErrorAction Continue
+                            New-Item -Path "$dir" -ItemType Directory -ErrorAction SilentlyContinue
                             if ($preLeaf) { New-Item -Path "$dir\$name" -ItemType File -ErrorAction Continue }
                             else { New-Item -Path "$dir\$name.ps1" -ItemType File -ErrorAction Continue }
                         } catch {
                             $successful = $false
                         }
-                        $dirInput = "$dir\$name"
+                        $dirInput = "$dir\$name.ps1"
                         if ($successful) { Write-Host "File successfully created." }
                         $selected = $true
                         $correct = $true
@@ -173,8 +179,7 @@ Example: open C:\users\$username\my creation.ps1
                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
                 $correct = $true
             }
-        } 
-        
+        }  
 
         # Direct the script to any available .ps1 scripts and it will assign itself to it
         "open" {
@@ -305,7 +310,7 @@ Write-Host "Q: Quit without saving"
                         $correct = $true
                         $isMade = $false }
                     "d" {
-                        $dirInput = "C:\users\connorr\new.ps1\"
+                        $dirInput = "C:\this\new.ps1\"
                         $selected = $true
                         $correct = $true
                         $isMade = $false }
