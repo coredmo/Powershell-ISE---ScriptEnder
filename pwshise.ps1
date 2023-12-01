@@ -5,7 +5,7 @@ $option = "none"
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
-$username = $parts[-1] # This gets the current users name and strips its domain name
+$username = $parts[-1] # Gets the current users name and strips its domain name
 
 $orig_fg_color = $host.UI.RawUI.ForegroundColor
 
@@ -31,11 +31,11 @@ while ($option -eq "none") {
     Write-Host "`nType a command or 'help' for a list of commands"
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
-    if ($choice -ieq "a command") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
+    if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
-    # ^This will split something like "open C:\this.ps1" into "open" and "C:\this.ps1"
+    # ^This will split something like "open C:\this thing.ps1" into "open" and "C:\this thing.ps1"
     # VThis will check if the input is a valid command and if so, make sure the extra part is a valid path to a script.
     if ($validCmd -contains $choice) {
         if ($tokens.Count -eq 2) {
@@ -84,7 +84,7 @@ Example: open C:\users\$username\my creation.ps1
         e: check dir
 
 "@
-            Write-Host "Press any key to restart the script..."
+            Write-Host "Press any key to return..."
             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
             Clear-Host
             $correct = $true
@@ -92,56 +92,60 @@ Example: open C:\users\$username\my creation.ps1
 
         # Create a new .ps1 script file in any directory with any name. (Requires admin to create files in some locations)
         "new" {
-            while ($true) {
-                while ($dirInit -eq $true) {
-                    Write-Host "Do you want to make $dirInput`nas the designated file?`nY = Yes | N = No"
-                    $choose = [System.Console]::ReadKey().Key
-                    switch ($choose) {
-                        "Y" { 
-                            $preDir = $false
-                            $regDep = $false
-                        }
-                        "N" {
-                            $regdep = $false
-                        }
+            while ($dirInit -eq $true) {
+                Write-Host "Do you want to make $dirInput`nand set it as the designated file?`nY = Yes | N = No"
+                $choose = [System.Console]::ReadKey().Key
+                switch ($choose) {
+                    "Y" { 
+                        $preDir = $true
+                        $regDep = $false
+                    }
+                    "N" {
+                        $regdep = $false
                     }
                 }
-                Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
-                $dir = Read-Host ">"; $dir = $dir.Trim()
-                Clear-Host
-                if (![string]::IsNullOrEmpty($dir)) {
-                    if (Test-Path $dir -PathType Container) {
-                        Write-Host "`nDirectory exists..."
-                        Set-Location -Path $dir
-                        $currentdir = Get-Location
-                        Write-Host "What is the name of your new script?"
-                        $name = Read-Host ">"; $name.Trim()
-                        try {
-                            Write-Host "`n$currentdir\$name.ps1"
-                            New-Item -Path "$currentdir\$name.ps1" -ItemType File -ErrorAction Stop
-                            $dirInput = "$currentdir\$name.ps1"
-                            Write-Host "File successfully created."
-                            $selected = $true
-                            $correct = $true
-                            break
-                        } catch {
-                            $host.UI.RawUI.ForegroundColor = "Red"
-                            Write-Host "Error creating the file: $_"
-                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                            continue
-                        }
-                    } else {
+            }
+
+            if ($preDir -eq $false) {
+            Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
+            $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim()
+            Clear-Host } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
+
+            if (![string]::IsNullOrEmpty($dirInput)) {
+                if (Test-Path $dirInput -PathType Container) {
+                    Write-Host "`nDirectory exists..."
+                    Set-Location -Path $dirInput
+                    $currentdir = Get-Location
+                    Write-Host "What is the name of your new script?"
+                    $name = Read-Host ">"; $name.Trim()
+                    try {
+                        Write-Host "`n$currentdir\$name.ps1"
+                        New-Item -Path "$currentdir\$name.ps1" -ItemType File -ErrorAction Stop
+                        $dirInput = "$currentdir\$name.ps1"
+                        Write-Host "File successfully created."
+                        $selected = $true
+                        $correct = $true
+                        break
+                    } catch {
                         $host.UI.RawUI.ForegroundColor = "Red"
-                        Write-Host "The specified path is not a valid directory."
+                        Write-Host "Error creating the file: $_"
                         $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                        $correct = $true
                     }
                 } else {
                     $host.UI.RawUI.ForegroundColor = "Red"
-                    Write-Host "Please enter a valid directory path."
+                    Write-Host "The specified path is not a valid directory."
                     $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    $correct = $true
                 }
-            } 
-        }
+            } else {
+                $host.UI.RawUI.ForegroundColor = "Red"
+                Write-Host "Please enter a valid directory."
+                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                $correct = $true
+            }
+        } 
+        
 
         # Direct the script to any available .ps1 scripts and it will assign itself to it
         "open" {
@@ -158,12 +162,14 @@ Example: open C:\users\$username\my creation.ps1
                     }
                 }
             }
+
             if ($preDir -eq $false) {
             Write-Host "`nPlease enter the directory of the powershell script you want to edit`nExample: C:\Users\$username\Desktop\whatImMaking.ps1`nIt must have a .ps1 extension"
             $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim(); if ($dirInput.EndsWith("\")) { $dirInput = $dirInput.Substring(0, $dirInput.Length - 1) }
-            }
+            try { $fileExtension = (Get-Item $dirPart).Extension } catch {""} }
+
             if (![string]::IsNullOrEmpty($dirInput)) {
-                if (Test-Path $dirInput -PathType Leaf) {
+                if ($fileExtension -ieq ".ps1" -and (Test-Path $dirInput -PathType Leaf)) {
                     $dir = Split-Path -Path $dirInput -Parent
                     $name = Split-Path -Path $dirInput -Leaf
                     Clear-Host
@@ -172,7 +178,7 @@ Example: open C:\users\$username\my creation.ps1
                 } else {
                     Clear-Host
                     $host.UI.RawUI.ForegroundColor = "Red"
-                    Write-Host "Please enter an actual directory`nRemember to add the name of the powershell script you want to edit with the .ps1 extension"
+                    Write-Host "Please enter an actual directory`nRemember to add the .ps1 extension"
                     $host.UI.RawUI.ForegroundColor = $orig_fg_color
                 }
             } else {
@@ -224,7 +230,7 @@ Write-Host "Q: Quit without saving"
                          # Replace/edit logic
                     }
                     elseif ($key -eq "`enter") {
-                        try { Set-Content -Path $filePath -Value $content } catch {Write-Host "Error saving..."; Start-Sleep -Seconds 2}
+                        try { Set-Content -Path $filePath -Value $content } catch { Write-Host "Error saving..."; Start-Sleep -Seconds 2 }
                         Write-Host "Saved and exited."
                         $proEdit = $false
                         break
@@ -287,7 +293,7 @@ Write-Host "Q: Quit without saving"
         # ;)
         "booyeah" {
             "Opening 300 instances of the calculator..."
-            Start-Sleep -Milliseconds 2000
+            Start-Sleep -Milliseconds 1800
             "jk"; Start-Sleep -Milliseconds 650; "jk"
             Start-Sleep -Milliseconds 1000
             $correct = $true
@@ -316,7 +322,7 @@ Write-Host "Q: Quit without saving"
 }
 
 while ($option -eq "fibba") {
-    Write-Host "`nDebug & test section"
+    Write-Host "`nDebug & test section 1"
     Write-Host "`nPress any key to start the Fibonacci Mode..."
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     Clear-Host
@@ -335,11 +341,10 @@ while ($option -eq "fibba") {
         Clear-Host
         if ([System.Console]::KeyAvailable -and [System.Console]::ReadKey().Key -eq "C") { [System.Console]::Clear(); break }
     }
-
     Start-Sleep -Milliseconds 500
 }
 
 while ($option -eq "debug") {
-    Write-Host "This is the debug section"
+    Write-Host "This is a debug section"
     Start-Sleep -Milliseconds 20
 }
