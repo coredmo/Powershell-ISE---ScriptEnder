@@ -18,8 +18,10 @@ $proEdit = $true
 while ($option -eq "none") {
     $correct = $false
     $preDir = $false
+    $preName = $false
     $isMade = $true
     $noArg = $false
+    $dirInit = $false
     
     if ($selected -eq $true) {
         $dir = Split-Path -Path $dirInput -Parent
@@ -36,29 +38,47 @@ while ($option -eq "none") {
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     # ^This will split something like "open C:\this thing.ps1" into "open" and "C:\this thing.ps1"
-    # VThis will check if the input is a valid command and if so, make sure the extra part is a valid path to a script.
+    # VThis will check if the input is a valid command and if so, make sure the extra part is a valid path to a script/directory.
     if ($validCmd -contains $choice) {
         if ($tokens.Count -eq 2) {
             $dirPart = $tokens[1]
             if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
             if ([System.IO.Path]::IsPathRooted($dirPart)) {
-                $fileExtension = (Get-Item $dirPart).Extension
-                if (-not (Test-Path $dirPart -PathType Leaf)) {
-                    $noArg = $true
-                    $choice = $null
-                    $dirInit = $false
-                } elseif ($fileExtension -eq '.ps1') {
-                    $dirInput = $dirPart
-                    $dirInit = $true
+                $fileExtension = try { (Get-Item $dirPart -ErrorAction SilentlyContinue).BaseName + [System.IO.Path]::GetExtension($dirPart) }
+                    catch { [System.IO.Path]::GetExtension($dirPart) }
+                switch ($choice) {
+                    "open" {
+                        if (-not (Test-Path $dirPart -PathType Leaf)) {
+                            $noArg = $true
+                            $choice = $null
+                        } elseif ($fileExtension -eq '.ps1') {
+                            $dirInit = $true
+                        }
+                    }
+                    "new" {
+                    "$fileExtension"; Start-Sleep -Seconds 2
+                        if ($fileExtension -eq '.ps1') {
+                            $dirInit = $true
+                            $preName = $true
+                        } else { $dirInit = $true }
+                    }
                 }
-            }
-        } else { $dirInit = $false }
+            } else {""}
+        }
     }
     Clear-Host
     
     if ($noArg) { 
     $host.UI.RawUI.ForegroundColor = "Red"
-    Write-Host "Invalid argument. You must provide a .ps1 file`nExample: open c:\users\$username\test file\new.ps1." 
+    Write-Host @"
+
+Invalid argument. You must provide a .ps1 file
+Example: open c:\users\$username\test file\new.ps1." 
+
+You may input a directory or new file name in the new command:
+Example: new c:\users\$username\new folder
+NewFile: new c:\users\$username\new folder\new.ps1
+"@
     $host.UI.RawUI.ForegroundColor = $orig_fg_color 
     $correct = $true
     $noArg = $false
@@ -93,15 +113,18 @@ Example: open C:\users\$username\my creation.ps1
         # Create a new .ps1 script file in any directory with any name. (Requires admin to create files in some locations)
         "new" {
             while ($dirInit -eq $true) {
-                Write-Host "Do you want to make $dirInput`nand set it as the designated file?`nY = Yes | N = No"
+                Write-Host "Do you want to make $dirPart`nand set it as the designated file/folder?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key
                 switch ($choose) {
                     "Y" { 
                         $preDir = $true
-                        $regDep = $false
+                        $dirInit = $false
+                        $dirInput = $dirPart
+                        $dir = Split-Path -Path $dirInput -Parent
+                        $name = Split-Path -Path $dirInput -Leaf
                     }
                     "N" {
-                        $regdep = $false
+                        $dirInit = $false
                     }
                 }
             }
@@ -111,16 +134,24 @@ Example: open C:\users\$username\my creation.ps1
             $dirPart = Read-Host ">"; $dirPart = $dirPart.Trim()
             Clear-Host } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
 
-            if (![string]::IsNullOrEmpty($dirInput)) {
-                if ([System.IO.Path]::IsPathRooted($dir)) {
-                    Write-Host "`nDirectory exists...'nWhat is the name of your new script?"
-                    $name = Read-Host ">"; $name.Trim()
+            if (![string]::IsNullOrEmpty($dirPart)) {
+                if ([System.IO.Path]::IsPathRooted($dirPart)) {
+
+                    if ($preName -eq $false) {
+                    Write-Host "`nDirectory is compatible`nWhat is the name of your new script?"
+                    $name = Read-Host ">"; $name.Trim() } else { $preLeaf = $true }
+
                     try {
                         Write-Host "`n$dirPart\$name.ps1"
-                        New-Item -Path "$dirPart" -ItemType Directory -ErrorAction Continue
-                        New-Item -Path "$dirPart\$name.ps1" -ItemType File -ErrorAction Continue
-                        $dirInput = "$dirPart\$name.ps1"
-                        Write-Host "File successfully created."
+                        try {
+                            New-Item -Path "$dir" -ItemType Directory -ErrorAction Continue
+                            if ($preLeaf) { New-Item -Path "$dir\$name" -ItemType File -ErrorAction Continue }
+                            else { New-Item -Path "$dir\$name.ps1" -ItemType File -ErrorAction Continue }
+                        } catch {
+                            $successful = $false
+                        }
+                        $dirInput = "$dir\$name"
+                        if ($successful) { Write-Host "File successfully created." }
                         $selected = $true
                         $correct = $true
                         break
@@ -148,12 +179,13 @@ Example: open C:\users\$username\my creation.ps1
         # Direct the script to any available .ps1 scripts and it will assign itself to it
         "open" {
             while ($dirInit -eq $true) {
-                Write-Host "Do you want to select $dirInput`nas the designated file?`nY = Yes | N = No"
+                Write-Host "Do you want to select $dirPart`nas the designated file?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key
                 switch ($choose) {
                     "Y" { 
                         $preDir = $true
                         $dirInit = $false
+                        $dirInput = $dirPart
                     }
                     "N" {
                         $dirInit = $false
