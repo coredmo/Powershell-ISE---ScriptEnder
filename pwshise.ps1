@@ -338,62 +338,6 @@ while ($option -eq "fibba") {
 }
 
 while ($option -eq "debug") {
-    if ($dirInput -ne $null) { 
-    if (Test-Path $dirInput -PathType Leaf) {
-    $content = Get-Content $dirInput
-    $cursorPosition = 0
-
-    while ($true) {
-        Clear-Host
-        $content | ForEach-Object { Write-Host $_ }
-
-        Write-Host @"
-      ---------------------
-Write-Host "Arrow keys: Navigate"
-Write-Host "Backspace: Delete"
-Write-Host "Enter: Save and exit"
-Write-Host "Q: Quit without saving"
-"@
-
-        $key = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-        if ($key -eq "`0") {
-            $key = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").VirtualKeyCode
-            switch ($key) {
-                37 { $cursorPosition = [Math]::Max(0, $cursorPosition - 1) }
-                39 { $cursorPosition = [Math]::Min($content.Count, $cursorPosition + 1) }
-                8  { 
-                    if ($cursorPosition -gt 0) {
-                        $content = $content[0..($cursorPosition - 2)] + $content[$cursorPosition..($content.Count - 1)]
-                        $cursorPosition--
-                    }
-                }
-            }
-        }
-        elseif ($key -eq "`r") {
-            # Replace logic
-        }
-        elseif ($key -eq "`enter") {
-            Set-Content -Path $dirInput -Value $content
-            Write-Host "Saved and exited."
-            break
-        }
-        elseif ($key -eq "q") {
-            Write-Host "Exited without saving."
-            break
-        }
-        else {
-            $content = $content[0..($cursorPosition - 1)] + $key + $content[$cursorPosition..($content.Count - 1)]
-            $cursorPosition++
-        }
-    }
-} 
-    else {
-    Write-Host "The specified file does not exist.`nExiting the script..."
-    Start-Sleep -Seconds 2
-    Exit
-  } } else {
-    Write-Host "No files are selected`nExiting..."
-    Start-Sleep -Seconds 2
-    Exit
-	}
+    Write-Host "This is the debug section"
+    Start-Sleep -Milliseconds 20
 }
