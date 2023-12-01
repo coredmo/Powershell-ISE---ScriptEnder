@@ -108,20 +108,18 @@ Example: open C:\users\$username\my creation.ps1
 
             if ($preDir -eq $false) {
             Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
-            $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim()
+            $dirPart = Read-Host ">"; $dirPart = $dirPart.Trim()
             Clear-Host } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
 
             if (![string]::IsNullOrEmpty($dirInput)) {
-                if (Test-Path $dirInput -PathType Container) {
-                    Write-Host "`nDirectory exists..."
-                    Set-Location -Path $dirInput
-                    $currentdir = Get-Location
-                    Write-Host "What is the name of your new script?"
+                if ([System.IO.Path]::IsPathRooted($dir)) {
+                    Write-Host "`nDirectory exists...'nWhat is the name of your new script?"
                     $name = Read-Host ">"; $name.Trim()
                     try {
-                        Write-Host "`n$currentdir\$name.ps1"
-                        New-Item -Path "$currentdir\$name.ps1" -ItemType File -ErrorAction Stop
-                        $dirInput = "$currentdir\$name.ps1"
+                        Write-Host "`n$dirPart\$name.ps1"
+                        New-Item -Path "$dirPart" -ItemType Directory -ErrorAction Continue
+                        New-Item -Path "$dirPart\$name.ps1" -ItemType File -ErrorAction Continue
+                        $dirInput = "$dirPart\$name.ps1"
                         Write-Host "File successfully created."
                         $selected = $true
                         $correct = $true
