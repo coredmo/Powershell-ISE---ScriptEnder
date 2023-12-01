@@ -1,16 +1,7 @@
 #The script to end scripting - Created by Connor :)
 
-$validCmd = @('help','new','open','e','edit','fit','booyeah','this')
-
-while ($true) { $choose = [System.Console]::ReadKey().Key; [System.Console]::Clear()
-    if ($choose -ieq "a") {
-        $choose = "none"
-        break
-    } elseif ($choose -ieq "b") {
-        $choose = "debug" # I could have made this change $option but I'm not
-        break
-    }
-} $option = "$choose" # This chooses which area of the script to start - "none" or "debug" - This functionality will go away
+$validCmd = @('new','open','edit','debug') # Commands that can use a directory
+$option = "none"
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
@@ -42,20 +33,21 @@ while ($option -eq "none") {
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
-
+    # ^This will split something like "open C:\this.ps1" into "open" and "C:\this.ps1"
+    # VThis will check if the input is a valid command and if so, make sure the extra part is a valid path to a script.
     if ($validCmd -contains $choice) {
         if ($tokens.Count -eq 2) {
-            $dirInit = $true
             $dirPart = $tokens[1]
-            $this = [System.IO.Path]::IsPathRooted($dirPart); Write-host "$this";
             if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
             if ([System.IO.Path]::IsPathRooted($dirPart)) {
+                $fileExtension = (Get-Item $dirPart).Extension
                 if (-not (Test-Path $dirPart -PathType Leaf)) {
                     $noArg = $true
                     $choice = $null
                     $dirInit = $false
-                } else {
+                } elseif ($fileExtension -eq '.ps1') {
                     $dirInput = $dirPart
+                    $dirInit = $true
                 }
             }
         } else { $dirInit = $false }
@@ -64,7 +56,7 @@ while ($option -eq "none") {
     
     if ($noArg) { 
     $host.UI.RawUI.ForegroundColor = "Red"
-    Write-Host "Invalid argument. You must provide a .ps1 file`nExample: open c:\users\$currentUser\test file\new.ps1." 
+    Write-Host "Invalid argument. You must provide a .ps1 file`nExample: open c:\users\$username\test file\new.ps1." 
     $host.UI.RawUI.ForegroundColor = $orig_fg_color 
     $correct = $true
     $noArg = $false
@@ -79,9 +71,15 @@ The Help Menu:
 
 help: List this menu
 new: Create a new Powershell script file
-open: Select an existing .ps1 as active | You can add a path after open <path>
+open: Select an existing .ps1 as active
 edit: It's prophesized to at least contain something
 booyeah
+
+You can add a file path after a command
+Example: open C:\users\$username\my creation.ps1
+
+(Debug) fit: fill dir
+        e: check dir
 
 "@
             Write-Host "Press any key to restart the script..."
@@ -184,25 +182,27 @@ booyeah
             $correct = $true
         }
 
-        "e" {"$dirInput $choice $dirPart"; Start-Sleep -Seconds 1}
         # Add descriptive information, create variables, and pre-made/custom script pieces using the inputted variables
         "edit" {
             if ($dirInput -ne $null) { 
                 if (Test-Path $dirInput -PathType Leaf) {
                     $content = Get-Content $dirInput
                     $cursorPosition = 0
-
-                while ($proEdit -eq $true) {
+                while ($proEdit -eq "true") {
                     Clear-Host
                     $content | ForEach-Object { Write-Host $_ }
 
+                    $host.UI.RawUI.ForegroundColor = "Yellow"
                     Write-Host @"
-      ---------------------
+
+
+     |---------------------|
 Write-Host "Arrow keys: Navigate"
 Write-Host "Backspace: Delete"
 Write-Host "Enter: Save and exit"
 Write-Host "Q: Quit without saving"
 "@
+                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
 
                     $key = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                     if ($key -eq "`0") {
@@ -222,7 +222,7 @@ Write-Host "Q: Quit without saving"
                          # Replace/edit logic
                     }
                     elseif ($key -eq "`enter") {
-                        Set-Content -Path $filePath -Value $content
+                        try { Set-Content -Path $filePath -Value $content } catch {Write-Host "Error saving..."; Start-Sleep -Seconds 2}
                         Write-Host "Saved and exited."
                         $proEdit = $false
                         break
@@ -240,18 +240,24 @@ Write-Host "Q: Quit without saving"
             } 
                 else {
                 Write-Host "The specified file does not exist.`nExiting the script..."
+                $correct = $true
                 Start-Sleep -Seconds 2
                 Clear-Host
             } } else {
                 Write-Host "No files are selected`nExiting..."
                 Start-Sleep -Seconds 2
+                $correct = $true
                 Clear-Host
             }
         }
 
+        # Check what the directory is (Debug)
+        "e" {"$dirInput <Active- dirs -Potential> $dirPart"; [System.Console]::ReadKey().Key; [System.Console]::Clear()}
+
+        # Set the directory to a preset (Debug)
         "fit" {
             while ($isMade) {
-                Write-Host "Press a for a real file -11/29/2023-, press d for a fake one (for if the file no longer exists while selected)"
+                Write-Host "Press a for a real file -11/29/2023-, press d for a fake one (for if the file no longer exists)`npress c to cancel"
                 $fitChoice = [System.Console]::ReadKey().Key
                 [System.Console]::Clear()
                 switch ($fitChoice) {
@@ -265,22 +271,26 @@ Write-Host "Q: Quit without saving"
                         $selected = $true
                         $correct = $true
                         $isMade = $false }
+                    "c" {
+                        $selected = $true
+                        $correct = $true
+                        $isMade = $false }
                 }
+                if ($dirInput.EndsWith("\")) { try { $dirInput = $dirInput.Substring(0, $dirInput.Length - 1) } catch {""}}
                 Clear-Host
-                if ($dirInput.EndsWith("\")) { $dirInput = $dirInput.Substring(0, $dirInput.Length - 1) }
-                Test-Path $dirInput -PathType Leaf
+                "The Directory is a path?"; Test-Path $dirInput -PathType Leaf
             }
         }
 
         # ;)
         "booyeah" {
             "Opening 300 instances of the calculator..."
-            Start-Sleep -Seconds 2
-            "jk"; Start-Sleep -Milliseconds 750; "jk"
-            Start-Sleep -Seconds 2
+            Start-Sleep -Milliseconds 1800
+            "jk"; Start-Sleep -Milliseconds 650; "jk"
+            Start-Sleep -Milliseconds 1000
             $correct = $true
             while ($true) { 
-                Write-Host "Press A or B"
+                Write-Host "Press A-debug or B-fibba"
                 $choose = [System.Console]::ReadKey().Key
                 [System.Console]::Clear()
                 if ($choose -ieq "a") {
