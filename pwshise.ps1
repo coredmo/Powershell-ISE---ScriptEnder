@@ -44,15 +44,15 @@ while ($option -eq "none") {
             $dirPart = $tokens[1]
             if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
             if ([System.IO.Path]::IsPathRooted($dirPart)) {
-                $fileExtension = try { (Get-Item $dirPart -ErrorAction SilentlyContinue).BaseName + [System.IO.Path]::GetExtension($dirPart) }
-                    catch { [System.IO.Path]::GetExtension($dirPart) }
+                $fileExtension = try { (Get-Item $dirPart -ErrorAction SilentlyContinue).Extension }
+                    catch { [System.IO.Path]::GetExtension($dirPart); "HAHA"; Start-Sleep -Seconds 8 }
                 switch ($choice) {
                     "open" {
-                        if (-not (Test-Path $dirPart -PathType Leaf)) {
+                        if ((Test-Path $dirPart -PathType Leaf) -and $fileExtension -eq '.ps1') {
+                            $dirInit = $true
+                        } else {
                             $noArg = $true
                             $choice = $null
-                        } elseif ($fileExtension -eq '.ps1') {
-                            $dirInit = $true
                         }
                     }
                     "new" {
@@ -290,7 +290,7 @@ Write-Host "Q: Quit without saving"
         }
 
         # Check what the directory is (Debug)
-        "e" {"$dirInput <Active- dirs -Potential> $dirPart"; [System.Console]::ReadKey().Key; [System.Console]::Clear()}
+        "e" { "$dirInput <Active- dirs -Potential> $dirPart"; "$fileExtension"; [System.Console]::ReadKey().Key; [System.Console]::Clear(); }
 
         # Set the directory to a preset (Debug)
         "fit" {
