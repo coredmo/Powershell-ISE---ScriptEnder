@@ -134,10 +134,12 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             if ($preDir -eq $false -and -not $alrSelected -eq $true) {
             Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
             $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim()
-            Clear-Host } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
-
             $dir = Split-Path -Path $dirInput -Parent -ErrorAction SilentlyContinue
             $name = Split-Path -Path $dirInput -Leaf -ErrorAction SilentlyContinue
+            Clear-Host 
+            } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
+            
+            
 
             if (![string]::IsNullOrEmpty($dirInput)) {
                 if ([System.IO.Path]::IsPathRooted($dirInput)) {
