@@ -143,12 +143,10 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 
             if (![string]::IsNullOrEmpty($dirInput)) {
                 if ([System.IO.Path]::IsPathRooted($dirInput)) {
-
-                    if ($preName -eq $false) {
+                    if ($preName -eq $false -and $dirPart -eq $null) {
                     Write-Host "`nDirectory is compatible`nWhat is the name of your new script?"
                     $name = Read-Host ">"; $name.Trim() } else { $preLeaf = $true }
                     $name = $name.Replace(".ps1","")
-
                     try {
                         Write-Host "`n$dir\$name.ps1"
                         try {
@@ -348,6 +346,7 @@ Write-Host "Q: Quit without saving"
         }
     }
 
+    $dirPart = $null
     if ($correct -eq $true) {
         continue
     }
