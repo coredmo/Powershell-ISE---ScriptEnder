@@ -75,7 +75,7 @@ while ($option -eq "none") {
 Invalid argument. You must provide a .ps1 file
 Example: open c:\users\$username\test file\new.ps1." 
 
-You may input a directory or new file name in the new command:
+You may input a directory or new file name with the new command:
 Example: new c:\users\$username\new folder
 NewFile: new c:\users\$username\new folder\new.ps1
 "@
@@ -184,7 +184,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         # Direct the script to any available .ps1 scripts and it will assign itself to it
         "open" {
             while ($dirInit -eq $true) {
-                Write-Host "Do you want to select $dirPart`nas the designated file?`nY = Yes | N = No"
+                Write-Host "Do you want to select $dirPart`nand set it as the designated file?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key
                 switch ($choose) {
                     "Y" { 
