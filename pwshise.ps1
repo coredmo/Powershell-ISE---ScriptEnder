@@ -95,6 +95,7 @@ help: List this menu
 new: Create a new Powershell script file
 open: Select an existing .ps1 as active
 edit: It's prophesized to at least contain something
+search: Search your PC's active directory computer descriptions
 booyeah:
 
 You can add a file path after a command or create a new script in the current directory
@@ -104,13 +105,14 @@ Example: new here | new h
 (Debug) fit: fill dir
         e: check dir
 
-- Connor's Scripted ISE -
+- Connor's Scripted ISE & Toolkit -
 https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 "@
             Write-Host "Press any key to return..."
             $noid = Read-Host -Debug
             if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" }
             Clear-Host
+            if ($noid -ieq " ") { Write-Host "You can use the first letter of the commands to execute them as well" }
             $correct = $true
         }
 
