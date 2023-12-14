@@ -86,7 +86,7 @@ NewFile: new c:\users\$username\new folder\new.ps1
 
     switch ($choice) {
         # THE HELP MENU - Uses $correct to skip the "Input an actual command" error
-        "help" {
+        {$_ -in "help", "h"} {
             Write-Host @"
 
 The Help Menu:
@@ -115,7 +115,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         }
 
         # Create a new .ps1 script file in any directory with any name. (Requires admin to create files in some locations)
-        "new" {
+        {$_ -in "new", "n"} {
             while ($dirInit -eq $true) {
                 Write-Host "Do you want to make $dirPart`nand set it as the designated file/folder?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key
@@ -182,7 +182,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         }  
 
         # Direct the script to any available .ps1 scripts and it will assign itself to it
-        "open" {
+        {$_ -in "open", "o"} {
             while ($dirInit -eq $true) {
                 Write-Host "Do you want to select $dirPart`nand set it as the designated file?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key
@@ -226,7 +226,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         }
 
         # Add descriptive information, create variables, and pre-made/custom script pieces using the inputted variables
-        "edit" {
+        {$_ -in "edit", "e"} {
             if ($dirInput -ne $null) { 
                 if (Test-Path $dirInput -PathType Leaf) {
                     $content = Get-Content $dirInput
@@ -291,6 +291,40 @@ Write-Host "Q: Quit without saving"
                 Start-Sleep -Seconds 2
                 $correct = $true
                 Clear-Host
+            }
+        }
+
+        # Search the local active directory's computer descriptions
+        {$_ -in "ad", "search", "s"} {
+            $adMode = $true
+            while ($adMode -eq $true) {
+                do {
+                    $input = Read-Host "Enter the first or last name of the associate you want to search for"
+                    if (-not $input) {
+                        [System.Console]::Clear();
+                        $host.UI.RawUI.ForegroundColor = "Red"
+                        Write-Host "Error: Input cannot be blank. Please enter a valid name."
+                        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    }
+                } while (-not $input)
+
+                $host.UI.RawUI.ForegroundColor = "Yellow"
+                Write-Host "Showing results for $input`n"
+                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+
+                $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description
+
+                if ($result) {
+                    foreach ($computer in $result) {
+                        Write-Host "$($computer.Name), $($computer.Description)"
+                        "----------------------------"
+                    }
+                } else {
+                    Write-Host "No results found for $input`n"
+                }
+                Write-Host "`nPress any key to refresh...`nPress c to return to the command line..."
+                $adOption = [System.Console]::ReadKey().Key; [System.Console]::Clear();
+                if ($adOption -ieq "c") { $adMode = $false; $correct = $true}
             }
         }
 
