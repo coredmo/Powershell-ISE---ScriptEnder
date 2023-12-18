@@ -34,7 +34,7 @@ while ($option -eq "none") {
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
     if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
-    if ($choice -ieq "new here" -or $choice -ieq "new h" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!" }
+    if ($choice -ieq "new here" -or $choice -ieq "new h" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!"; Start-Sleep -Seconds 10 }
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
@@ -140,8 +140,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             $name = Split-Path -Path $dirInput -Leaf -ErrorAction SilentlyContinue
             Clear-Host 
             } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
-            
-            
+
 
             if (![string]::IsNullOrEmpty($dirInput)) {
                 if ([System.IO.Path]::IsPathRooted($dirInput)) {
@@ -346,7 +345,7 @@ Write-Host "Q: Quit without saving"
                         $correct = $true
                         $isMade = $false }
                     "d" {
-                        $dirInput = "C:\this\new.ps1\"
+                        $dirInput = "C:\users\Connor\new.ps1\"
                         $selected = $true
                         $correct = $true
                         $isMade = $false }
