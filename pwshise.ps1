@@ -34,7 +34,7 @@ while ($option -eq "none") {
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
     if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
-    if ($choice -ieq "new here" -or $choice -ieq "new h" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!" }
+    if ($choice -ieq "new here", "new h", "n h" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!" }
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
