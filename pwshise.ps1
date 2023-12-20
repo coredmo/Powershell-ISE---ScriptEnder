@@ -1,6 +1,6 @@
 #The script to end scripting - Created by Connor :)
 
-$validCmd = @('new','open','edit','debug') # Commands that can use a directory
+$validCmd = @('new','n','open','o','edit','e','debug') # Commands that can use a directory
 $option = "none"
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -34,7 +34,7 @@ while ($option -eq "none") {
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
     if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
-    if ($choice -ieq "new here", "new h", "n h" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!" }
+    if ($choice -ieq "new here", "nh" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!" }
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
@@ -93,14 +93,16 @@ The Help Menu:
 
 help: List this menu
 new: Create a new Powershell script file
-open: Select an existing .ps1 as active
+open: Select an existing .ps1 file as active
 edit: It's prophesized to at least contain something
 search: Search your PC's active directory computer descriptions
 booyeah:
 
 You can add a file path after a command or create a new script in the current directory
 Example: open C:\users\$username\my creation.ps1
-Example: new here | new h
+Example: new here   |   nh
+
+Often times Y = "e" and N = "q"
 
 (Debug) fit: fill dir
         e: check dir
@@ -136,6 +138,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             if ($preDir -eq $false -and -not $alrSelected -eq $true) {
             Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
             $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim()
+            if ($dirInput.EndsWith("\")) { $dirInput = $dirInput.Substring(0, $dirInput.Length - 1) }
             $dir = Split-Path -Path $dirInput -Parent -ErrorAction SilentlyContinue
             $name = Split-Path -Path $dirInput -Leaf -ErrorAction SilentlyContinue
             Clear-Host 
@@ -148,7 +151,8 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                     if ($preName -eq $false -and $dirPart -eq $null) {
                     Write-Host "`nDirectory is compatible`nWhat is the name of your new script?"
                     $name = Read-Host ">"; $name.Trim() } else { $preLeaf = $true }
-                    $name = $name.Replace(".ps1","")
+
+                    if ($preLeaf -eq $false) { $name = $name.Replace(".ps1","") }
                     try {
                         Write-Host "`n$dir\$name.ps1"
                         try {
@@ -299,7 +303,15 @@ Write-Host "Q: Quit without saving"
         # Search the local active directory's computer descriptions
         {$_ -in "ad", "search", "s"} {
             $adMode = $true
+            $pingConfig = $false
             while ($adMode -eq $true) {
+                $adLoop = $true
+                while ($adLoop) {
+                    Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
+                    $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                    if ($adInput -ieq "y" -or $adInput -ieq "e") { $pingConfig = $true; $adLoop = $false }
+                    if ($adInput -ieq "n" -or $adInput -ieq "q") { $pingConfig = $false; $adLoop = $false }
+                }
                 do {
                     $input = Read-Host "Enter the first or last name of the associate you want to search for"
                     if (-not $input) {
@@ -319,6 +331,16 @@ Write-Host "Q: Quit without saving"
                 if ($result) {
                     foreach ($computer in $result) {
                         Write-Host "$($computer.Name), $($computer.Description)"
+                        $nsResult = nslookup $($computer.Name)
+                        $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
+                        $nsMatches = [regex]::Matches($nsResult, $nsRegex)
+                        if ($pingConfig -eq $true) { 
+                            $pingResult = ping -n 1 $nsMatches
+                            if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                            else { $host.UI.RawUI.ForegroundColor = "Green"; "The host '$nsMatches' was pinged successfully"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                        }
+                        $macResult = arp -a | findstr "$nsMatches"
+                        Write-Host "$macResult`n"
                         "----------------------------"
                     }
                 } else {
