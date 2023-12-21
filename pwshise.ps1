@@ -38,7 +38,7 @@ while ($option -eq "none") {
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     # ^ This will split something like "open C:\this thing.ps1" into "open" and "C:\this thing.ps1"
-    # V This will check if the input is a valid command and if so, make sure the extra part is a valid path to a script/directory.
+    # v This will check if the input is a valid command and if so, make sure the extra part is a valid path to a script/directory.
     if ($validCmd -contains $choice) {
         if ($tokens.Count -eq 2) {
             $dirPart = $tokens[1]
