@@ -94,7 +94,7 @@ help: List this menu
 new: Create a new Powershell script file
 open: Select an existing .ps1 file as active
 edit: It's prophesized to at least contain something
-search: Search your PC's active directory computer descriptions
+search: Search your PC's active directory computer descriptions and query for MAC addresses
 booyeah:
 
 You can add a file path after a command or create a new script in the current directory
@@ -302,14 +302,14 @@ Write-Host "Q: Quit without saving"
         {$_ -in "ad", "search", "s"} {
             $adMode = $true
             $pingConfig = $false
+            $adLoop = $true
+            while ($adLoop) {
+                Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
+                $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                if ($adInput -ieq "y" -or $adInput -ieq "e") { $pingConfig = $true; $adLoop = $false; "Pinging each selected host" }
+                if ($adInput -ieq "n" -or $adInput -ieq "q") { $pingConfig = $false; $adLoop = $false; "Skipping ping function"}
+            }
             while ($adMode -eq $true) {
-                $adLoop = $true
-                while ($adLoop) {
-                    Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
-                    $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-                    if ($adInput -ieq "y" -or $adInput -ieq "e") { $pingConfig = $true; $adLoop = $false; "Pinging each selected host" }
-                    if ($adInput -ieq "n" -or $adInput -ieq "q") { $pingConfig = $false; $adLoop = $false; "Skipping ping function"}
-                }
                 do {
                     $input = Read-Host "Enter the first or last name of the associate you want to search for"
                     if (-not $input) {
