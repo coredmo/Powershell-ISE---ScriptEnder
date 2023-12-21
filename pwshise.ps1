@@ -94,7 +94,9 @@ help: List this menu
 new: Create a new Powershell script file
 open: Select an existing .ps1 file as active
 edit: It's prophesized to at least contain something
-search: Search your PC's active directory computer descriptions and query for MAC addresses
+search | ad | s: Search your PC's active directory computer descriptions and query for MAC addresses
+wake   | wol: Send a magic packet to a MAC Address, UDP via port 7
+exprs  |  rs: Restart and open Windows Explorer
 booyeah:
 
 You can add a file path after a command or create a new script in the current directory
@@ -358,6 +360,28 @@ Write-Host "Q: Quit without saving"
                 if ($adOption -ieq "c") { $adMode = $false; $correct = $true}
             }
         }
+
+        # Send a magic packet to a MAC Address, UDP via port 7
+        {$_ -in "wake","wol","w"} {
+            $wolMode = $true
+            while ($wolMode -eq $true) {
+	            $mac = Read-Host "Input a MAC Address or leave it blank to return"
+                if ($mac -eq $null -or $mac -eq '') { $wolMode = $false; $correct = $true; Clear-Host } 
+                else {
+	                $macByteArray = $mac -split "[:-]" | ForEach-Object { [Byte] "0x$_"}
+	                [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray  * 16)
+	                $udpClient = New-Object System.Net.Sockets.UdpClient
+	                $udpClient.Connect(([System.Net.IPAddress]::Broadcast),7)
+	                $udpClient.Send($MagicPacket,$MagicPacket.Length)
+	                $udpClient.Close()
+	                Start-Sleep -Seconds 3
+                    Write-Host "$mac --- $macByteArray"
+                }
+            }
+        }
+
+        # Restart and open Windows Explorer
+        {$_ -in "exprs","rs"} { Stop-Process -Name explorer -Force; Start-Process explorer; $correct = $true }
 
         # Check what the directory is (Debug)
         "e" { "$dirInput <Active- dirs -Potential> $dirPart"; "$fileExtension"; [System.Console]::ReadKey().Key; [System.Console]::Clear(); }
