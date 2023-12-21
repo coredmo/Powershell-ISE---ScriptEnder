@@ -1,6 +1,6 @@
 #The script to end scripting - Created by Connor :)
 
-$validCmd = @('new','open','edit','debug') # Commands that can use a directory
+$validCmd = @('new','n','open','o','edit','e','debug') # Commands that can use a directory
 $option = "none"
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -34,13 +34,12 @@ while ($option -eq "none") {
     $choice = Read-Host ">"; $choice = $choice.Trim()
 
     if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
-    if ($choice -ieq "new here" -or $choice -ieq "new h" -and [System.IO.Path]::IsPathRooted($dirInput) -eq $true) { $alrSelected = $true; "HERE!"; Start-Sleep -Seconds 10 }
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     # ^ This will split something like "open C:\this thing.ps1" into "open" and "C:\this thing.ps1"
     # V This will check if the input is a valid command and if so, make sure the extra part is a valid path to a script/directory.
-    if ($validCmd -contains $choice -and -not $alrSelected -eq $true) {
+    if ($validCmd -contains $choice) {
         if ($tokens.Count -eq 2) {
             $dirPart = $tokens[1]
             if ($dirPart.EndsWith("\")) { $dirPart = $dirPart.Substring(0, $dirPart.Length - 1) }
@@ -93,14 +92,16 @@ The Help Menu:
 
 help: List this menu
 new: Create a new Powershell script file
-open: Select an existing .ps1 as active
+open: Select an existing .ps1 file as active
 edit: It's prophesized to at least contain something
-search: Search your PC's active directory computer descriptions
+search: Search your PC's active directory computer descriptions and query for MAC addresses
 booyeah:
 
 You can add a file path after a command or create a new script in the current directory
 Example: open C:\users\$username\my creation.ps1
-Example: new here | new h
+Example: new here   |   nh
+
+Often times Y = "e" and N = "q"
 
 (Debug) fit: fill dir
         e: check dir
@@ -120,12 +121,13 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         {$_ -in "new", "n"} {
             while ($dirInit -eq $true) {
                 Write-Host "Do you want to make $dirPart`nand set it as the designated file/folder?`nY = Yes | N = No"
-                $choose = [System.Console]::ReadKey().Key
+                $choose = [System.Console]::ReadKey().Key; [System.Console]::Clear()
                 switch ($choose) {
                     "Y" { 
                         $preDir = $true
                         $dirInit = $false
-                        $dirInput = $dirPart
+                        $newInput = $dirPart
+                        $dir = $newInput
                     }
                     "N" {
                         $dirInit = $false
@@ -133,21 +135,23 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                 }
             }
 
-            if ($preDir -eq $false -and -not $alrSelected -eq $true) {
+            if ($preDir -eq $false) {
             Write-Host "`nWhat directory will the file be created in? Example: C:\users\$username`nYour C:\ starting folder may not allow you to create a new file."
-            $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim()
-            $dir = Split-Path -Path $dirInput -Parent -ErrorAction SilentlyContinue
-            $name = Split-Path -Path $dirInput -Leaf -ErrorAction SilentlyContinue
+            $newInput = Read-Host ">"; $newInput = $newInput.Trim()
+            if ($newInput.EndsWith("\")) { $newInput = $newInput.Substring(0, $newInput.Length - 1) }
+            $dir = $newInput
             Clear-Host 
             } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
 
 
-            if (![string]::IsNullOrEmpty($dirInput)) {
-                if ([System.IO.Path]::IsPathRooted($dirInput)) {
-                    if ($preName -eq $false -and $dirPart -eq $null) {
-                    Write-Host "`nDirectory is compatible`nWhat is the name of your new script?"
-                    $name = Read-Host ">"; $name.Trim() } else { $preLeaf = $true }
-                    $name = $name.Replace(".ps1","")
+            if (![string]::IsNullOrEmpty($newInput)) {
+                if ([System.IO.Path]::IsPathRooted($newInput)) {
+                    if ($preName -eq $false) {
+                        Write-Host "`nDirectory is compatible`nWhat is the name of your new script?"
+                        $name = Read-Host ">"; $name.Trim()
+                    } else { $preLeaf = $true }
+
+                    if ($preLeaf -eq $false) { $name = $name.Replace(".ps1","") }
                     try {
                         Write-Host "`n$dir\$name.ps1"
                         try {
@@ -157,9 +161,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                         } catch {
                             $successful = $false
                         }
-                        $dirInput = "$dir\$name.ps1"
-                        if ($successful) { Write-Host "File successfully created." }
-                        $selected = $true
+                        if ($successful) { Write-Host "File successfully created."; $dirInput = "$dir\$name.ps1"; $selected = $true }
                         $correct = $true
                         break
                     } catch {
@@ -191,7 +193,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                     "Y" { 
                         $preDir = $true
                         $dirInit = $false
-                        $dirInput = $dirPart
+                        $openInput = $dirPart
                     }
                     "N" {
                         $dirInit = $false
@@ -201,13 +203,13 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 
             if ($preDir -eq $false) {
             Write-Host "`nPlease enter the directory of the powershell script you want to edit`nExample: C:\Users\$username\Desktop\whatImMaking.ps1`nIt must have a .ps1 extension"
-            $dirInput = Read-Host ">"; $dirInput = $dirInput.Trim(); if ($dirInput.EndsWith("\")) { $dirInput = $dirInput.Substring(0, $dirInput.Length - 1) }
+            $openInput = Read-Host ">"; $openInput = $openInput.Trim(); if ($openInput.EndsWith("\")) { $openInput = $openInput.Substring(0, $openInput.Length - 1) }
             try { $fileExtension = (Get-Item $dirPart).Extension } catch {""} }
 
-            if (![string]::IsNullOrEmpty($dirInput)) {
-                if ($fileExtension -ieq ".ps1" -and (Test-Path $dirInput -PathType Leaf)) {
-                    $dir = Split-Path -Path $dirInput -Parent
-                    $name = Split-Path -Path $dirInput -Leaf
+            if (![string]::IsNullOrEmpty($openInput)) {
+                if ($fileExtension -ieq ".ps1" -and (Test-Path $openInput -PathType Leaf)) {
+                    $dir = Split-Path -Path $openInput -Parent
+                    $name = Split-Path -Path $openInput -Leaf
                     Clear-Host
                     $selected = $true
                     $correct = $true
@@ -298,6 +300,14 @@ Write-Host "Q: Quit without saving"
         # Search the local active directory's computer descriptions
         {$_ -in "ad", "search", "s"} {
             $adMode = $true
+            $pingConfig = $false
+            $adLoop = $true
+            while ($adLoop) {
+                Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
+                $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                if ($adInput -ieq "y" -or $adInput -ieq "e") { $pingConfig = $true; $adLoop = $false; "Pinging each selected host" }
+                if ($adInput -ieq "n" -or $adInput -ieq "q") { $pingConfig = $false; $adLoop = $false; "Skipping ping function"}
+            }
             while ($adMode -eq $true) {
                 do {
                     $input = Read-Host "Enter the first or last name of the associate you want to search for"
@@ -318,6 +328,25 @@ Write-Host "Q: Quit without saving"
                 if ($result) {
                     foreach ($computer in $result) {
                         Write-Host "$($computer.Name), $($computer.Description)"
+                        $nsResult = nslookup $($computer.Name)
+                        $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
+                        $nsMatches = [regex]::Matches($nsResult, $nsRegex)
+                        if ($pingConfig -eq $true) { 
+                            $pingResult = ping -n 1 $nsMatches
+                            if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                            else { $host.UI.RawUI.ForegroundColor = "Green"; "The host '$nsMatches' was pinged successfully"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                        }
+                        $macResult = arp -a | findstr "$nsMatches"
+                        if ($macResult -eq $null -or $macResult -eq '') {
+                            if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
+                            if ($diffLan -eq $true) {
+                            $host.UI.RawUI.ForegroundColor = "Yellow"
+                            Write-Host "This host may be in a different LAN"
+                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                            $diffLan = $false
+                            }
+                        }
+                        $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
                         "----------------------------"
                     }
                 } else {
