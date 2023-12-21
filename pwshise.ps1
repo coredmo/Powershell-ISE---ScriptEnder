@@ -125,13 +125,13 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                 Write-Host "Do you want to make $dirPart`nand set it as the designated file/folder?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key; [System.Console]::Clear()
                 switch ($choose) {
-                    "Y" { 
+                    {$_ -in "y","e"} { 
                         $preDir = $true
                         $dirInit = $false
                         $newInput = $dirPart
                         $dir = $newInput
                     }
-                    "N" {
+                    {$_ -in "n","q"} {
                         $dirInit = $false
                     }
                 }
@@ -193,12 +193,12 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                 Write-Host "Do you want to select $dirPart`nand set it as the designated file?`nY = Yes | N = No"
                 $choose = [System.Console]::ReadKey().Key
                 switch ($choose) {
-                    "Y" { 
+                    {$_ -in "y","e"} { 
                         $preDir = $true
                         $dirInit = $false
                         $openInput = $dirPart
                     }
-                    "N" {
+                    {$_ -in "n","q"} {
                         $dirInit = $false
                     }
                 }
