@@ -308,12 +308,12 @@ Write-Host "Q: Quit without saving"
             while ($adLoop) {
                 Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
                 $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-                if ($adInput -ieq "y" -or $adInput -ieq "e") { $pingConfig = $true; $adLoop = $false; "Pinging each selected host" }
-                if ($adInput -ieq "n" -or $adInput -ieq "q") { $pingConfig = $false; $adLoop = $false; "Skipping ping function"}
+                if ($adInput -ieq "y" -or $adInput -ieq "e") { $pingConfig = $true; $adLoop = $false; [System.Console]::Clear(); "Pinging each selected host" }
+                if ($adInput -ieq "n" -or $adInput -ieq "q") { $pingConfig = $false; $adLoop = $false; [System.Console]::Clear(); "Skipping ping function"}
             }
             while ($adMode -eq $true) {
                 do {
-                    $input = Read-Host "Enter the first or last name of the associate you want to search for"
+                    $input = Read-Host "Enter the first or last name of the associate you want to search for`n You can press 'c' while it's querying to abort the process`n>"
                     if (-not $input) {
                         [System.Console]::Clear();
                         $host.UI.RawUI.ForegroundColor = "Red"
@@ -329,28 +329,35 @@ Write-Host "Q: Quit without saving"
                 $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description
 
                 if ($result) {
-                    foreach ($computer in $result) {
-                        Write-Host "$($computer.Name), $($computer.Description)"
-                        $nsResult = nslookup $($computer.Name)
-                        $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
-                        $nsMatches = [regex]::Matches($nsResult, $nsRegex)
-                        if ($pingConfig -eq $true) { 
-                            $pingResult = ping -n 1 $nsMatches
-                            if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-                            else { $host.UI.RawUI.ForegroundColor = "Green"; "The host '$nsMatches' was pinged successfully"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                    foreach ($computer in $result) { $cancelResult = $false
+                        if ([System.Console]::KeyAvailable -and [System.Console]::ReadKey().Key -eq "C") {
+                            Write-Host " button pressed:`nAborting query..."
+                            Start-Sleep -Milliseconds 60
+                            $cancelResult = $true
                         }
-                        $macResult = arp -a | findstr "$nsMatches"
-                        if ($macResult -eq $null -or $macResult -eq '') {
-                            if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
-                            if ($diffLan -eq $true) {
-                            $host.UI.RawUI.ForegroundColor = "Yellow"
-                            Write-Host "This host may be in a different LAN"
-                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                            $diffLan = $false
+                        if ($cancelResult -eq $false) {                            
+                            Write-Host "$($computer.Name), $($computer.Description)"
+                            $nsResult = nslookup $($computer.Name)
+                            $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
+                            $nsMatches = [regex]::Matches($nsResult, $nsRegex)
+                            if ($pingConfig -eq $true) { 
+                                $pingResult = ping -n 1 $nsMatches
+                                if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                                else { $host.UI.RawUI.ForegroundColor = "Green"; "The host '$nsMatches' was pinged successfully"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
                             }
-                        }
-                        $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                        "----------------------------"
+                            $macResult = arp -a | findstr "$nsMatches"
+                            if ($macResult -eq $null -or $macResult -eq '') {
+                                if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
+                                if ($diffLan -eq $true) {
+                                $host.UI.RawUI.ForegroundColor = "Yellow"
+                                Write-Host "This host may be in a different LAN"
+                                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                                $diffLan = $false
+                                }
+                            }
+                            $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                            "----------------------------"
+                        } else { break }
                     }
                 } else {
                     Write-Host "No results found for $input`n"
