@@ -143,6 +143,65 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             }
         }
 
+        {$_ -in "ping","p"} {
+            $pingOption = $true
+            while ($pingOption -eq $true) {
+                if ($prePing -eq $null) { do {
+                    $pingIP = Read-Host "- Easy ping utility - Enter an IP -`n>"
+                    if (-not $pingIP) {
+                        [System.Console]::Clear();
+                        $host.UI.RawUI.ForegroundColor = "Red"
+                        Write-Host "Error: Input cannot be blank. Please enter a valid string."
+                        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    }
+                } while (-not $pingIP) }
+
+                do {
+                    $eValues = @('a', 'b', 'c')
+                    Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - Basic 5 attempt ping | B - Basic 1 attempt ping | C - Indefinite"
+                    $n = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                    if ($eValues -notcontains $n) {
+                        [System.Console]::Clear();
+                        $host.UI.RawUI.ForegroundColor = "Red"
+                        Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
+                        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    }
+                } while ($eValues -notcontains $n)
+                [System.Console]::Clear()
+                $host.UI.RawUI.ForegroundColor = "Yellow"
+                Write-Host "Processing Ping..."
+                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+
+                if ($n -ieq "a") { $n = 5 } elseif ($n -ieq "b") { $n = 1 }
+                if ($n -ieq "c") { $constPing = $true } else { $pingResult = ping -n $n $pingIP }
+
+                while ($constPing -eq $true) {
+                    $pingResult = ping -n 1 $pingIP
+                    "$pingResult`n"
+                    Start-Sleep -Milliseconds 500
+                    if ([System.Console]::KeyAvailable -and [System.Console]::ReadKey().Key -eq "C") {
+                        Write-Host " > Abort button pressed:`nPress any key to continue"
+                        [System.Console]::ReadKey().Key
+                        $constPing = $false
+                    }
+                }
+
+                [System.Console]::Clear()
+                $pingResult
+
+                $host.UI.RawUI.ForegroundColor = "Yellow"
+                Write-Host "`nPress any key to restart or press C to return to the console"
+                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+
+                $cancel = [System.Console]::ReadKey().Key
+                [System.Console]::Clear()
+                if ($cancel -ieq "c") { $pingOption = $null }
+            }
+            [System.Console]::Clear()
+            $correct = $true
+            $prePing = $null
+        }
+
         # Restart and open Windows Explorer
         {$_ -in "exprs","rs"} { Stop-Process -Name explorer -Force; Start-Process explorer; $correct = $true }
 
