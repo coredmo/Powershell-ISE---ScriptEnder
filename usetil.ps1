@@ -1,4 +1,4 @@
-#The script to end scripting - Created by Connor :)
+# A convenient bundle of scripted utilities - Created by Connor :)
 
 $option = "none"
 
@@ -27,9 +27,9 @@ The Help Menu:
 help: List this menu
 
 search | ad | s: Search your PC's active directory computer descriptions and query for MAC addresses
-wake   | wol: Send a magic packet to a MAC Address, UDP via port 7
-exprs  |  rs: Restart and open Windows Explorer
-booyeah:
+wake    |   wol: Send a magic packet to a MAC Address, UDP via port 7
+ping     |    p: Ping a selected host in 3 different modes
+exprs     |  rs: Restart and open Windows Explorer
 
 Often times Y = "e" and N = "q"
 
@@ -158,7 +158,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 
                 do {
                     $eValues = @('a', 'b', 'c')
-                    Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - Basic 5 attempt ping | B - Basic 1 attempt ping | C - Indefinite"
+                    Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - 5 attempts | B - 1 attempt | C - Indefinite"
                     $n = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                     if ($eValues -notcontains $n) {
                         [System.Console]::Clear();
