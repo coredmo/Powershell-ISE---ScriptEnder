@@ -1,6 +1,7 @@
 # A convenient bundle of scripted utilities - Created by Connor :)
 
 $option = "none"
+$validCmd = @('ping','p')
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
@@ -16,6 +17,11 @@ while ($option -eq "none") {
     [System.Console]::Clear()
 
     if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
+
+    $tokens = $choice -split '\s+', 2
+    $choice = $tokens[0]
+    
+    if ($validCmd -contains $choice -and $tokens[1]) { $pingIP = $tokens[1]; $prePing = $true }
 
     switch ($choice) {
         # THE HELP MENU - Uses $correct to skip the "Input an actual command" error
@@ -158,7 +164,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 
                 do {
                     $eValues = @('a', 'b', 'c')
-                    Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - 5 attempts | B - 1 attempt | C - Indefinite"
+                    Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - 5 attempts | B - 1 attempts | C - Indefinite"
                     $n = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                     if ($eValues -notcontains $n) {
                         [System.Console]::Clear();
