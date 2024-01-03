@@ -152,15 +152,17 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         {$_ -in "ping","p"} {
             $pingOption = $true
             while ($pingOption -eq $true) {
-                if ($prePing -eq $null) { do {
-                    $pingIP = Read-Host "- Easy ping utility - Enter an IP -`n>"
-                    if (-not $pingIP) {
-                        [System.Console]::Clear();
-                        $host.UI.RawUI.ForegroundColor = "Red"
-                        Write-Host "Error: Input cannot be blank. Please enter a valid string."
-                        $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                    }
-                } while (-not $pingIP) }
+                if ($prePing -eq $null) { 
+                    do {
+                        $pingIP = Read-Host "- Easy ping utility - Enter an IP -`n>"
+                        if (-not $pingIP) {
+                            [System.Console]::Clear();
+                            $host.UI.RawUI.ForegroundColor = "Red"
+                            Write-Host "Error: Input cannot be blank. Please enter a valid string."
+                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                        }
+                    } while (-not $pingIP) 
+                }
 
                 do {
                     $eValues = @('a', 'b', 'c')
@@ -181,6 +183,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                 if ($n -ieq "a") { $n = 5 } elseif ($n -ieq "b") { $n = 1 }
                 if ($n -ieq "c") { $constPing = $true } else { $pingResult = ping -n $n $pingIP }
 
+                if ($constPing -eq $true) { Write-Host "Press C at any point to cancel" }
                 while ($constPing -eq $true) {
                     $pingResult = ping -n 1 $pingIP
                     "$pingResult`n"
