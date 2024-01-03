@@ -60,7 +60,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             }
             while ($adMode -eq $true) {
                 do {
-                    $input = Read-Host "- Enter the first or last name of the associate you want to search for`n You can press 'c' while it's querying to abort the process -`n>"
+                    $input = Read-Host "- Enter the first or last name of the associate you want to search for -`n You can press 'c' while it's querying to abort the process`n>"
                     if (-not $input) {
                         [System.Console]::Clear();
                         $host.UI.RawUI.ForegroundColor = "Red"
@@ -68,7 +68,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                         $host.UI.RawUI.ForegroundColor = $orig_fg_color
                     }
                 } while (-not $input)
-
+                [System.Console]::Clear();
                 $host.UI.RawUI.ForegroundColor = "Yellow"
                 Write-Host "Showing results for $input`n"
                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
