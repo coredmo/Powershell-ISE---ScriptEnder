@@ -140,8 +140,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             $dir = $newInput
             Clear-Host 
             } # MAKE THIS HAVE A BETTER ERROR MESSAGE, IT USES THE DEFAULT ONE
-            
-            
+
 
             if (![string]::IsNullOrEmpty($newInput)) {
                 if ([System.IO.Path]::IsPathRooted($newInput)) {
@@ -312,7 +311,7 @@ Write-Host "Q: Quit without saving"
                         $correct = $true
                         $isMade = $false }
                     "d" {
-                        $dirInput = "C:\this\new.ps1\"
+                        $dirInput = "C:\users\Connor\new.ps1\"
                         $selected = $true
                         $correct = $true
                         $isMade = $false }
