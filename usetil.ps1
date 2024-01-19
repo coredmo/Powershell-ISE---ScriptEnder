@@ -217,9 +217,10 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         # Run a simple forced group policy update
         {$_ -in "gpupdate","gp"} {
             Write-Host "Running Group Policy Update"
-            gpupdate /f
+            gpupdate /Force
             Write-Host "Press any key to close this window..."
             [System.Console]::ReadKey().Key
+            $correct = $true
         }
 
         # Restart and open Windows Explorer
