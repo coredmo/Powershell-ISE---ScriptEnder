@@ -32,10 +32,12 @@ The Help Menu:
 
 help: List this menu
 
-search | ad | s: Search your PC's active directory computer descriptions and query for MAC addresses
-wake    |   wol: Send a magic packet to a MAC Address, UDP via port 7
-ping     |    p: Ping a selected host in 3 different modes
-exprs     |  rs: Restart and open Windows Explorer
+search   | ad |   s: Search your PC's active directory computer descriptions and query for MAC addresses
+wake     |      wol: Send a magic packet to a MAC Address, UDP via port 7
+ping     |        p: Ping a selected host in 3 different modes
+exprs    |       rs: Restart and open Windows Explorer
+gpupdate | gpu | gp: Run a simple forced group policy update
+            booyeah: -
 
 Often times Y = "e" and N = "q"
 
@@ -149,6 +151,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             }
         }
 
+        # Ping a selected host in different modes
         {$_ -in "ping","p"} {
             $pingOption = $true
             while ($pingOption -eq $true) {
@@ -209,6 +212,14 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             [System.Console]::Clear()
             $correct = $true
             $prePing = $null
+        }
+
+        # Run a simple forced group policy update
+        {$_ -in "gpupdate","gp"} {
+            Write-Host "Running Group Policy Update"
+            gpupdate /f
+            Write-Host "Press any key to close this window..."
+            [System.Console]::ReadKey().Key
         }
 
         # Restart and open Windows Explorer
