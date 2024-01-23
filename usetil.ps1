@@ -16,7 +16,7 @@ while ($option -eq "none") {
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
 
-    if ($choice -ieq "a command" -or $choice -ieq "clr") { $correct = $true; ":D"; Start-Sleep -Milliseconds 1 }
+    if ($choice -ieq "a command") { $correct = $true; ":D" }
 
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
@@ -30,14 +30,15 @@ while ($option -eq "none") {
 
 The Help Menu:
 
-help: List this menu
+help | h: List this menu
 
-search   | ad |   s: Search your PC's active directory computer descriptions and query for MAC addresses
-wake     |      wol: Send a magic packet to a MAC Address, UDP via port 7
-ping     |        p: Ping a selected host in 3 different modes
-exprs    |       rs: Restart and open Windows Explorer
-gpupdate | gpu | gp: Run a simple forced group policy update
-            booyeah: -
+terminal |  term |  t: Start-Process cmd.exe or powershell.exe
+search   |  ad   |  s: Search your PC's active directory computer descriptions and query for MAC addresses
+wake     |  wol  |  w: Send a magic packet to a MAC Address, UDP via port 7
+ping     |          p: Ping a selected host in 3 different modes
+exprs    |         rs: Restart and open Windows Explorer
+gpupdate |  gpu  | gp: Run a simple forced group policy update
+              booyeah: -
 
 Often times Y = "e" and N = "q"
 
@@ -45,11 +46,33 @@ Often times Y = "e" and N = "q"
 https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 "@
             Write-Host "Press enter to return..."
-            $noid = Read-Host -Debug
-            if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" }
-            Clear-Host
-            if ($noid -ieq " ") { Write-Host "You can use the first letter of the commands to execute them as well" }
+            $noid = Read-Host -Debug; Clear-Host
+            if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($noid -ieq " ") { Write-Host "dingus" }
             $correct = $true
+        }
+
+        # Start-Process cmd.exe or powershell.exe
+        {$_ -in "terminal","term","t"} {
+            $correct = $true
+            Write-Host "Do you want to start the instance in Administrator? Y or E - Yes"
+            $tchoose1 = [System.Console]::ReadKey().Key
+            [System.Console]::Clear()
+
+            Write-Host "Press E for cmd.exe or press Q for powershell.exe"
+            $tchoose2 = [System.Console]::ReadKey().Key
+            [System.Console]::Clear()
+
+            if ($tchoose2 -ieq "e") {
+                if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs }
+                else { Start-Process cmd.exe }
+            } 
+            elseif ($tchoose2 -ieq "q") {
+                if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process powershell.exe -Verb RunAs }
+                else { Start-Process powershell.exe }
+            } 
+            else { $host.UI.RawUI.ForegroundColor = "Red"
+                Write-Host "Invalid"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            }
         }
 
         # Search the local active directory's computer descriptions
@@ -218,7 +241,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         {$_ -in "gpupdate","gp"} {
             Write-Host "Running Group Policy Update"
             gpupdate /Force
-            Write-Host "Press any key to close this window..."
+            Write-Host "Press any key to continue..."
             [System.Console]::ReadKey().Key
             $correct = $true
         }
@@ -226,7 +249,6 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         # Restart and open Windows Explorer
         {$_ -in "exprs","rs"} { Stop-Process -Name explorer -Force; Start-Process explorer; $correct = $true }
 
-        # ;)
         "booyeah" {
             "Opening 300 instances of the calculator..."
             Start-Sleep -Milliseconds 1800
