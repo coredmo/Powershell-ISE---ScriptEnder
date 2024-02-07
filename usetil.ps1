@@ -1,6 +1,7 @@
 # A convenient bundle of scripted utilities - Created by Connor :)
 
 $option = "none"
+$makeChoice = $true
 $validCmd = @('ping','p')
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -12,17 +13,20 @@ $orig_fg_color = $host.UI.RawUI.ForegroundColor
 while ($option -eq "none") {
     $correct = $false
 
-    Write-Host "`nType a command or 'help' for a list of commands"
-    $choice = Read-Host ">"; $choice = $choice.Trim()
-    [System.Console]::Clear()
+    if ($makeChoice -eq $true) {
+        Write-Host "`nType a command or 'help' for a list of commands"
+        $choice = Read-Host ">"; $choice = $choice.Trim()
+        [System.Console]::Clear()
 
-    if ($choice -ieq "a command") { $correct = $true; ":D" }
+        if ($choice -ieq "a command") { $correct = $true; ":D" }
 
-    $tokens = $choice -split '\s+', 2
-    $choice = $tokens[0]
+        $tokens = $choice -split '\s+', 2
+        $choice = $tokens[0]
+        if ($validCmd -contains $choice -and $tokens[1]) { $pingIP = $tokens[1]; $prePing = $true }
+    }
+
+    if ($recentMode -eq $true) { $choice = "recent" } else { $makeChoice = $true }
     
-    if ($validCmd -contains $choice -and $tokens[1]) { $pingIP = $tokens[1]; $prePing = $true }
-
     switch ($choice) {
         # THE HELP MENU - Uses $correct to skip the "Input an actual command" error
         {$_ -in "help", "h"} {
@@ -54,6 +58,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         # Start-Process cmd.exe or powershell.exe
         {$_ -in "terminal","term","t"} {
             $correct = $true
+            $folderPath = "C:\users\$username"
             Write-Host "Do you want to start the instance in Administrator? Y or E - Yes"
             $tchoose1 = [System.Console]::ReadKey().Key
             [System.Console]::Clear()
@@ -63,12 +68,12 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             [System.Console]::Clear()
 
             if ($tchoose2 -ieq "e") {
-                if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs }
-                else { Start-Process cmd.exe }
+                if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs -WorkingDirectory $folderPath }
+                else { Start-Process cmd.exe -WorkingDirectory $folderPath }
             } 
             elseif ($tchoose2 -ieq "q") {
-                if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process powershell.exe -Verb RunAs }
-                else { Start-Process powershell.exe }
+                if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process powershell.exe -Verb RunAs -WorkingDirectory $folderPath }
+                else { Start-Process powershell.exe -WorkingDirectory $folderPath }
             } 
             else { $host.UI.RawUI.ForegroundColor = "Red"
                 Write-Host "Invalid"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -78,6 +83,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         # Search the local active directory's computer descriptions
         {$_ -in "ad", "search", "s"} {
             $adMode = $true
+            $preBreak = $false
             $pingConfig = $false
             $adLoop = $true
             while ($adLoop) {
@@ -113,14 +119,16 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             
                 $unitList = @();
                 if ($result) {
-                    foreach ($computer in $result) { $cancelResult = $false; $unitlist += $computer.Name
+                    foreach ($computer in $result) {
+                        $cancelResult = $false
                         if ([System.Console]::KeyAvailable -and [System.Console]::ReadKey().Key -eq "C") {
                             Write-Host " button pressed:`nAborting query..."
                             Start-Sleep -Milliseconds 60
                             $cancelResult = $true
                         }
                         if ($cancelResult) { break }
-            
+                        $unitlist += $computer.Name
+
                         Write-Host "$($computer.Name), $($computer.Description)"
                         $nsResult = nslookup $($computer.Name)
                         $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
@@ -142,7 +150,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                             if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
                             if ($diffLan -eq $true) {
                             $host.UI.RawUI.ForegroundColor = "Yellow"
-                            if ($dcTarget -eq $false) { Write-Host "This host may be in a different LAN" }
+                            if ($dcTarget -eq $false) { Write-Host "  This host may be in a different LAN" }
                             $dcTarget = $false
                             $host.UI.RawUI.ForegroundColor = $orig_fg_color
                             $diffLan = $false
@@ -161,13 +169,23 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             }
         }
 
-        # Add ability to select an address from $recents and read details/run scripts on them
+        # Select an address from the recents list and read details/run scripts on them
+        {$_ -in "recents", "recent", "rec", "r"} {
+            if ($recents -ne $null) {
+                $recentMode = $true
+                while ($recentMode) {
+                    $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    $thiss = Read-Host; if ($thiss -ieq "c") { $rcSelect = $false; $correct = $true }
+                }
+            } else { Write-Host "There is no recents list, use the AD Query script to make one"; $correct = $true }
+        }
 
         # Send a magic packet to a MAC Address, UDP via port 7
         {$_ -in "wake","wol","w"} {
             $wolMode = $true
             while ($wolMode -eq $true) {
-	            $mac = Read-Host "Input a MAC Address or leave it blank to return"
+	            if ($recentMode -eq $true) { $mac = $recentMAC }
+                else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
                 if ($mac -eq $null -or $mac -eq '') { $wolMode = $false; $correct = $true; Clear-Host } 
                 else {
 	                $macByteArray = $mac -split "[:-]" | ForEach-Object { [Byte] "0x$_"}
@@ -176,8 +194,9 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 	                $udpClient.Connect(([System.Net.IPAddress]::Broadcast),7)
 	                $udpClient.Send($MagicPacket,$MagicPacket.Length)
 	                $udpClient.Close()
-	                Start-Sleep -Seconds 3
-                    Write-Host "$mac --- $macByteArray"
+	                Write-Host "$mac --- $macByteArray"
+                    Start-Sleep -Milliseconds 2800
+                    if ($recentMode -eq $true) { $wolMode = $false; $correct = $true; Clear-Host }
                 }
             }
         }
