@@ -1,4 +1,5 @@
 # A convenient bundle of scripted utilities - Created by Connor :)
+# Convenient bundle MY ASS! REMAKE THIS PIECE OF SHIT (it doesn't need to be entirely in a switch statement, (I'm delusional))
 
 $option = "none"
 $makeChoice = $true
@@ -25,6 +26,7 @@ while ($option -eq "none") {
         if ($validCmd -contains $choice -and $tokens[1]) { $pingIP = $tokens[1]; $prePing = $true }
     }
 
+    # Discontinued in favor of a revised version
     if ($recentMode -eq $true) { $choice = "recent" } else { $makeChoice = $true }
     
     switch ($choice) {
@@ -46,7 +48,7 @@ gpupdate |  gpu  | gp: Run a simple forced group policy update
 
 Often times Y = "e" and N = "q"
 
-- Connor's Scripted Toolkit (ISE Iteration 1)-
+- Connor's Scripted Toolkit (ISE Iteration 1) -
 https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 "@
             Write-Host "Press enter to return..."
@@ -78,9 +80,10 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
             else { $host.UI.RawUI.ForegroundColor = "Red"
                 Write-Host "Invalid"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
             }
+            exit
         }
 
-        # Search the local active directory's computer descriptions
+        # Search the local active directory's computer descriptions (I never learned to comment ig)
         {$_ -in "ad", "search", "s"} {
             $adMode = $true
             $preBreak = $false
@@ -99,8 +102,8 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
                 if ($savedConfo -eq $true -and $recents.Count -gt 0) { 
                     $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
                 do {
-                    Write-Host "- Enter any piece of the computer object's description or leave it blank to return to the console -"
-                    $input = Read-Host "You can press 'c' while it's querying to abort the process`n>"
+                    Write-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -"
+                    $input = Read-Host "You can press 'c' while its querying to abort the process`n>"
                     if (-not $input) {
                         [System.Console]::Clear();
                         $adMode = $false
@@ -170,6 +173,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
         }
 
         # Select an address from the recents list and read details/run scripts on them
+        # Discontinued in favor of a revised version
         {$_ -in "recents", "recent", "rec", "r"} {
             if ($recents -ne $null) {
                 $recentMode = $true
