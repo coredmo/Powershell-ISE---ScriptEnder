@@ -1,6 +1,5 @@
 ﻿# A convenient bundle of scripted utilities - Created and managed by Connor :)
 
-#$unitList = @("webb222","thisonetoo","webb224","webb225")
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b'
 $bam = "a"
@@ -45,7 +44,6 @@ if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($no
 }
 
     # Recents and AD functionality
-        #region
 
     # Search the local active directory's computer descriptions (I never learned to comment ig)
 function Scan-Create {
@@ -141,51 +139,42 @@ function Scan-Create {
 }
 
 function Invoke-Recents {
-    # "`n------------`n"
-    foreach ($compObj in $unitList) {
-        $noArp = $false
-        $cancelResult = $false
-        if ([System.Console]::KeyAvailable -and [System.Console]::ReadKey().Key -eq "C") {
-            Write-Host " button pressed:`nAborting query..."
-            Start-Sleep -Milliseconds 60
-            $cancelResult = $true
+    $noArp = $false
+    $noIPV4 = $false
+    Write-Host "Select a unit from your recents list. Press OK in the bottom right once you have selected."
+
+    # Display the list in a grid view window and store the selected item
+    $global:selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
+    
+    $ipv4Result = nslookup $selectedUnit
+    $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
+    if ($nsResultV4.Count -lt 2) {
+            $noIPV4 = $true
+    } else { $resultV4 = $nsResultV4[1] }
+
+    $arpResult = arp -a | findstr "$resultV4"
+    if (-not $arpResult -and -not [regex]::Matches($arpResult, $macRegEx)) {
+        $noArp = $true
+    } else { $global:mac = [regex]::Matches($arpResult, $macRegEx) }
+
+    Clear-Host
+    if (-not $noIPV4) { "IPV4:`n$resultV4`n" }
+    if (-not $noArp) { "MAC Address:`n$mac`n" }
+
+    $tempSelect = $true
+    while ($tempSelect) {
+        Write-Host "Do you want to select this host as the primary unit? Y - N"
+        $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+        switch ($adInput) {
+            {$_ -in "y", "e"} { $global:recentMode = $true; $tempSelect = $false }
+            {$_ -in "n", "q"} { $tempSelect = $false }
         }
-        if ($cancelResult) { break; Invoke-Recents }
-
-        Write-Host "$count - $compObj`n"
-        $count++
-
-        # Too Slow
-        #$pingResult = ping -n 1 $compObj
-        #if ($pingResult -match $pingRegEx) {
-        #    $pingResultV4 = [regex]::Matches($pingResult, $ipv4RegEx) | ForEach-Object { $_.Value }
-        #    $resultV4[0]
-        #}
-        
-        $ipv4Result = nslookup $compObj
-        $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
-        if ($nsResultV4.Count -lt 2) {
-            Write-Host "`nSkipping $compObj due to nslookup failure.`n`n------------`n"
-            continue
-        } else { $resultV4 = $nsResultV4[1] }
-
-        $arpResult = arp -a | findstr "$resultV4"
-        if (-not $arpResult -and -not [regex]::Matches($arpResult, $macRegEx)) {
-            Write-Host "No ARP entry found for $resultV4.`n"
-            $noArp = $true
-        } else { $mac = [regex]::Matches($arpResult, $macRegEx) }
-        
-        if ($noArp -eq $false) { "MAC Address:`n$mac`n" }
-        "IPv4: "; $resultV4
-        "`n------------`n"
     }
-    $count = 1
-    Read-Host
 }
-        #endregion
+
+
 
     #Utilities
-        #region
 
     # Start-Process cmd.exe or powershell.exe
 function Terminal {
@@ -216,7 +205,7 @@ function Terminal {
 function Invoke-WOL {
     $wolMode = $true
     while ($wolMode -eq $true) {
-        if ($recentMode -eq $true) { $mac = $recentMAC }
+        if ($recentMode -eq $true) { "" }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
         if ($mac -eq $null -or $mac -eq '') { $wolMode = $false; Clear-Host }
         else {
@@ -302,13 +291,15 @@ function Ping-Interface {
     [System.Console]::Clear()
     $prePing = $null
 }
-        #endregion
+
+
 
 while ($choosing) {
     $correct = $false
 
     # Read a command from a user and split it if they add extra parameters
     Write-Host "`nType a command or 'help' for a list of commands"
+    if ($recentMode -eq $true) { Write-Host "Selected Host: $selectedUnit - Enter 'e' to disable" }
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
     if ($choice -ieq "a command") { C; ":D" }
@@ -333,6 +324,9 @@ while ($choosing) {
         {$_ -in "terminal","term","t"} { C; Terminal }
 
         {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
+
+        {$_ -in "e", "d"} { C; $recentMode = $false; "Disabled Recent Mode" }
+
     }
 
     if ($correct -eq $true) {
