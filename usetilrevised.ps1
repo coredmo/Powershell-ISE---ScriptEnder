@@ -1,11 +1,10 @@
 ﻿# A convenient bundle of scripted utilities - Created and managed by Connor :)
 
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
-$macRegEx = '\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b'
-$bam = "a"
-$count = 1
+$macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
 
 $choosing = $true
+$recentMode = $false
 $validCmd = @('ping','p')
 
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -31,7 +30,6 @@ wake     |  wol  |  w: Send a magic packet to a MAC Address, UDP via port 7
 ping     |          p: Ping a selected host in 3 different modes
 exprs    |         rs: Restart and open Windows Explorer
 gpupdate |  gpu  | gp: Run a simple forced group policy update
-              booyeah: -
 
 Often times Y = "e" and N = "q"
 
@@ -44,49 +42,57 @@ if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($no
 }
 
     # Recents and AD functionality
-
-    # Search the local active directory's computer descriptions (I never learned to comment ig)
+        #region
+    # Search the local active directory's computer descriptions
 function Scan-Create {
     $adMode = $true
-    $preBreak = $false
-    $pingConfig = $false
     $adLoop = $true
+    $pingConfig = $false
     while ($adLoop) {
 
         Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
         $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+
+            # Get the domain controller IP
+        $global:dcIP = (Resolve-DnsName -Name (Get-ADDomainController).HostName | Select-Object -ExpandProperty IPAddress).ToString()
+
+            # Select Ping Mode
         switch ($adInput) {
             {$_ -in "y", "e"} {
-                $dcIP = (Resolve-DnsName -Name (Get-ADDomainController).HostName | Select-Object -ExpandProperty IPAddress).ToString()
                 $pingConfig = $true; $adLoop = $false; [System.Console]::Clear(); "Pinging each selected host"
             } {$_ -in "n", "q"} { $pingConfig = $false; $adLoop = $false; [System.Console]::Clear(); "Skipping ping function" }
         }
         Clear-Host
     }
     while ($adMode -eq $true) {
-
-        if ($savedConfo -eq $true -and $recents.Count -gt 0) { 
+            
+            # adRecents is is enabled if you have previously saved a unitList (Recents list)
+        if ($adRecents -eq $true -and $recents.Count -gt 0) { 
             $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-        do {
-            Write-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -"
-            $input = Read-Host "You can press 'c' while its querying to abort the process`n>"
-            if (-not $input) {
-                [System.Console]::Clear();
-                $adMode = $false
-                $preBreak = $true; break
-            }
-        } while (-not $input)
+
+        Write-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -"
+        $input = Read-Host "You can press 'c' while its querying to abort the process`n>"
+        if (-not $input) {
+            [System.Console]::Clear();
+            $adMode = $false
+            $preBreak = $true; break
+        }
+
         [System.Console]::Clear();
         if ($preBreak -eq $true) { continue }
     
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "Showing results for $input`n"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
-    
+        
+        # Grabs the Active Directory object description
         $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description
         $dcTarget = $false
-    
-        $global:unitList = @();
+        
+        # Initialize a recents list
+        $global:unitList = @()
+
+        # If there are results, iterate through each computer object, adding them to the unitList and grabbing information AS WELL AS pinging. Pressing C at any point will break the for loop.
         if ($result) {
             foreach ($computer in $result) {
                 $cancelResult = $false
@@ -96,17 +102,19 @@ function Scan-Create {
                     $cancelResult = $true
                 }
                 if ($cancelResult) { break }
-                $global:unitlist += $computer.Name
-    
+                
+                # Use nslookup to grab the computer's IP
                 Write-Host "$($computer.Name), $($computer.Description)"
                 $nsResult = nslookup $($computer.Name)
                 $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
-                $nsMatches = [regex]::Matches($nsResult, $nsRegex)
+                $resultV4 = [regex]::Matches($nsResult, $nsRegex)
+                $global:unitList += $resultV4[0].Value + "-" + $computer.Name
+
                 if ($pingConfig -eq $true) { 
-                    if ($dcIP -notcontains $nsMatches) {
-                        $pingResult = ping -n 1 $nsMatches
+                    if ($global:dcIP -notcontains $resultV4) {
+                        $pingResult = ping -n 1 $resultV4
                         if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-                        else { $host.UI.RawUI.ForegroundColor = "Green"; "The host '$nsMatches' was pinged successfully"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                        else { $host.UI.RawUI.ForegroundColor = "Green"; "The host '$resultV4' was pinged successfully"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
                     } else { 
                         $host.UI.RawUI.ForegroundColor = "Red"
                         "Ping skipped: Target is the domain controller"
@@ -114,7 +122,7 @@ function Scan-Create {
                         $dcTarget = $true
                     }
                 }
-                $macResult = arp -a | findstr "$nsMatches"
+                $macResult = arp -a | findstr "$resultV4"
                 if ($macResult -eq $null -or $macResult -eq '') {
                     if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
                     if ($diffLan -eq $true) {
@@ -134,48 +142,66 @@ function Scan-Create {
         Write-Host "`nPress any key to reset or press S to save this list to the recents list`nPress c to return to the command line..."
         $adOption = [System.Console]::ReadKey().Key; [System.Console]::Clear();
         if ($adOption -ieq "c") { $adMode = $false }
-        elseif ($adOption -ieq "s") { $recents = $unitList; $savedConfo = $true }
+        elseif ($adOption -ieq "s") { if (-not $unitList) { Write-Host "The recents list is empty" } else { $recents = $unitList; $adRecents = $true }}
     }
 }
 
 function Invoke-Recents {
-    $noArp = $false
-    $noIPV4 = $false
-    Write-Host "Select a unit from your recents list. Press OK in the bottom right once you have selected."
+    if (-not $unitList) { Write-Host "The recents list is empty" }
+    else {
+        $noArp = $false
+        $noIPV4 = $false
+        Write-Host "Select a unit from your recents list. Press OK in the bottom right once you have selected.`nDomain Controller: $dcIP`n"
+        
+        foreach ($unit in $unitList) {
+            $unitTokens = $unit -split '-', 2; $unitIP = $unitTokens[0].Trim(); $unitName = $unitTokens[1].Trim()
 
-    # Display the list in a grid view window and store the selected item
-    $global:selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
-    
-    $ipv4Result = nslookup $selectedUnit
-    $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
-    if ($nsResultV4.Count -lt 2) {
-            $noIPV4 = $true
-    } else { $resultV4 = $nsResultV4[1] }
+            $result = Get-ADComputer -Identity "$unitName" -Properties Description | Select-Object Name,Description
 
-    $arpResult = arp -a | findstr "$resultV4"
-    if (-not $arpResult -and -not [regex]::Matches($arpResult, $macRegEx)) {
-        $noArp = $true
-    } else { $global:mac = [regex]::Matches($arpResult, $macRegEx) }
+            $macResult = arp -a | findstr "$unitIP"
+            
+            if ($macResult -eq $null -or $macResult -eq '') {
+                $host.UI.RawUI.ForegroundColor = "Yellow"
+                Write-Host "The MAC wasn't in the ARP table"
+                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            } else { 
+                $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color 
+            }
+            
+            if (-not $macResult) { " " + $unitIP + "`n" }; if ($dcIP -contains $unitIP) { "Domain Controller`n" }; if (-not $result) { $unitName } else { $result.Name; $result.Description }
+            "`n------------`n"
+        }
 
-    Clear-Host
-    if (-not $noIPV4) { "IPV4:`n$resultV4`n" }
-    if (-not $noArp) { "MAC Address:`n$mac`n" }
+        Write-Host "`nPress any key to continue then select OK in the bottom right..."; $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
-    $tempSelect = $true
-    while ($tempSelect) {
-        Write-Host "Do you want to select this host as the primary unit? Y - N"
-        $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-        switch ($adInput) {
-            {$_ -in "y", "e"} { $global:recentMode = $true; $tempSelect = $false }
-            {$_ -in "n", "q"} { $tempSelect = $false }
+        # Display the list in a grid view window and store the selected item
+        $selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
+        $selectedTokens = $selectedUnit -split '-', 2; $selectedIP = $selectedTokens[0].Trim(); $selectedName = $selectedTokens[1].Trim()
+        
+        $ipv4Result = nslookup $selectedIP
+        $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
+        if ($nsResultV4.Count -lt 2) { "" } else { $resultV4 = $nsResultV4[1]; $mac = arp -a | findstr "$resultV4" }
+
+        Clear-Host
+        $selectedName
+        if ($mac) { $mac } else { " " + $selectedIP }
+        if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $mac = $matches[0] }
+
+        $tempSelect = $true
+        while ($tempSelect) {
+            Write-Host "Do you want to select this host as the primary unit? Y - N"
+            $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+            switch ($adInput) {
+                {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $mac; $global:selectedIP = $selectedIP; $global:selectedName = $selectedName; $tempSelect = $false }
+                {$_ -in "n", "q"} { $tempSelect = $false }
+            }
         }
     }
 }
-
-
+        #endregion
 
     #Utilities
-
+        #region
     # Start-Process cmd.exe or powershell.exe
 function Terminal {
     $folderPath = "C:\users\$username"
@@ -205,9 +231,9 @@ function Terminal {
 function Invoke-WOL {
     $wolMode = $true
     while ($wolMode -eq $true) {
-        if ($recentMode -eq $true) { "" }
+        if ($recentMode -eq $true) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC } else { "NO MAC ADDRESS" } }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
-        if ($mac -eq $null -or $mac -eq '') { $wolMode = $false; Clear-Host }
+        if ($mac -eq $null -or $mac -eq '') { $wolMode = $false }
         else {
             $macByteArray = $mac -split "[:-]" | ForEach-Object { [Byte] "0x$_"}
             [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray  * 16)
@@ -216,8 +242,8 @@ function Invoke-WOL {
             $udpClient.Send($MagicPacket,$MagicPacket.Length)
             $udpClient.Close()
             Write-Host "$mac --- $macByteArray"
-            Start-Sleep -Milliseconds 2800
-            if ($recentMode -eq $true) { $wolMode = $false; Clear-Host }
+            Start-Sleep -Milliseconds 1800
+            if ($recentMode -eq $true) { $wolMode = $false }
         }
     }
 }
@@ -234,21 +260,20 @@ function Group-Policy {
 function Ping-Interface {
     $pingOption = $true
     while ($pingOption -eq $true) {
-        if ($prePing -eq $null) { 
+        if ($recentMode -eq $false) { 
             do {
-                $pingIP = Read-Host "- Easy ping utility - Enter an IP -`n>"
+                $pingIP = Read-Host "- Ping utility - Enter an IP or leave it blank to return to command-line -`n>"
                 if (-not $pingIP) {
-                    [System.Console]::Clear();
-                    $host.UI.RawUI.ForegroundColor = "Red"
-                    Write-Host "Error: Input cannot be blank. Please enter a valid string."
-                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    $pingIp = "notnull"; $pingOption = $false
                 }
             } while (-not $pingIP) 
-        }
+        } else { $pingIP = $selectedName }
+
+        if ($pingOption -eq $false) { continue }
     
         do {
-            $eValues = @('a', 'b', 'c')
-            Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - 5 attempts | B - 1 attempts | C - Indefinite"
+            $eValues = @('a', 'b', 'e')
+            Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - 1 attempts | B - Indefinite | E - Exit"
             $n = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
             if ($eValues -notcontains $n) {
                 [System.Console]::Clear();
@@ -261,11 +286,12 @@ function Ping-Interface {
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "Processing Ping..."
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        
+        if ($n -ieq "e") { break }
+        elseif ($n -ieq "a") { $n = 1 }
+        elseif ($n -ieq "b") { $constPing = $true } else { $pingResult = ping -n $n $pingIP }
     
-        if ($n -ieq "a") { $n = 5 } elseif ($n -ieq "b") { $n = 1 }
-        if ($n -ieq "c") { $constPing = $true } else { $pingResult = ping -n $n $pingIP }
-    
-        if ($constPing -eq $true) { Write-Host "Press C at any point to cancel" }
+        if ($constPing -eq $true) { Write-Host "`nPress C at any point to cancel`n" }
         while ($constPing -eq $true) {
             $pingResult = ping -n 1 $pingIP
             "$pingResult`n"
@@ -291,26 +317,26 @@ function Ping-Interface {
     [System.Console]::Clear()
     $prePing = $null
 }
-
-
+        #endregion
 
 while ($choosing) {
     $correct = $false
 
     # Read a command from a user and split it if they add extra parameters
     Write-Host "`nType a command or 'help' for a list of commands"
-    if ($recentMode -eq $true) { Write-Host "Selected Host: $selectedUnit - Enter 'e' to disable" }
+    if ($recentMode -eq $true) { Write-Host "Selected Host: $selectedName - Enter 'e' to disable" }
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
     if ($choice -ieq "a command") { C; ":D" }
     
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
+    $parameter = $tokens[1]
 
     switch ($choice) { 
 
         {$_ -in "help", "h"} { C; Help }
-        
+
         {$_ -in "ad", "search", "s"} { C; Scan-Create }
 
         {$_ -in "recents", "recent", "rec", "r"} { C; Invoke-Recents }
@@ -325,7 +351,7 @@ while ($choosing) {
 
         {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
 
-        {$_ -in "e", "d"} { C; $recentMode = $false; "Disabled Recent Mode" }
+        {$_ -in "e", "d"} { C; if ($recentMode -eq $true) { $recentMode = $false; "Disabled Recent Mode" } }
 
     }
 
