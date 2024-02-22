@@ -13,7 +13,7 @@ $username = $parts[-1] # Gets the current users name and strips its domain name
 
 $orig_fg_color = $host.UI.RawUI.ForegroundColor
 
-# Ignores error handling
+    # Ignores error handling
 function C { $global:correct = $true }
 
     # THE HELP MENU
@@ -174,7 +174,7 @@ function Invoke-Recents {
 
         Write-Host "`nPress any key to continue then select OK in the bottom right..."; $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
-        # Display the list in a grid view window and store the selected item
+            # Display the list in a grid view window and store the selected item
         $selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
         $selectedTokens = $selectedUnit -split '-', 2; $selectedIP = $selectedTokens[0].Trim(); $selectedName = $selectedTokens[1].Trim()
         
@@ -183,24 +183,30 @@ function Invoke-Recents {
         if ($nsResultV4.Count -lt 2) { "" } else { $resultV4 = $nsResultV4[1]; $mac = arp -a | findstr "$resultV4" }
 
         Clear-Host
-        $selectedName
-        if ($mac) { $mac } else { " " + $selectedIP }
-        if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $mac = $matches[0] }
+        $result = Get-ADComputer -Identity "$selectedName" -Properties Description | Select-Object Name,Description
 
         $tempSelect = $true
-        while ($tempSelect) {
+        Do {
+                # Display the name of the ad object and its description then display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC address, transform it.
+            "`n"; $result.Name; $result.Description
+            if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
+            else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+            if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $mac = $matches[0] }; "`n"
+
             Write-Host "Do you want to select this host as the primary unit? Y - N"
             $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
             switch ($adInput) {
-                {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $mac; $global:selectedIP = $selectedIP; $global:selectedName = $selectedName; $tempSelect = $false }
+                    # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
+                {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $mac; $global:selectedIP = $selectedIP; $global:selectedName = $selectedName; $global:selectedResult = $result; $tempSelect = $false }
                 {$_ -in "n", "q"} { $tempSelect = $false }
             }
-        }
+            Clear-Host
+        } while ($tempSelect)
     }
 }
         #endregion
 
-    #Utilities
+    # Utilities
         #region
     # Start-Process cmd.exe or powershell.exe
 function Terminal {
@@ -324,7 +330,7 @@ while ($choosing) {
 
     # Read a command from a user and split it if they add extra parameters
     Write-Host "`nType a command or 'help' for a list of commands"
-    if ($recentMode -eq $true) { Write-Host "Selected Host: $selectedName - Enter 'e' to disable" }
+    if ($recentMode -eq $true) { Write-Host " - Selected Host: $selectedName - Enter 'e' to disable"; " - " + $selectedResult.Description }
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
     if ($choice -ieq "a command") { C; ":D" }
