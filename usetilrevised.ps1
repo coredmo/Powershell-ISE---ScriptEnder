@@ -187,17 +187,18 @@ function Invoke-Recents {
 
         $tempSelect = $true
         Do {
-                # Display the name of the ad object and its description then display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC address, transform it.
+                # Display the name of the ad object and its description then display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
             "`n"; $result.Name; $result.Description
             if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
             else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-            if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $mac = $matches[0] }; "`n"
+            if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
 
             Write-Host "Do you want to select this host as the primary unit? Y - N"
             $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
             switch ($adInput) {
                     # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
-                {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $mac; $global:selectedIP = $selectedIP; $global:selectedName = $selectedName; $global:selectedResult = $result; $tempSelect = $false }
+                {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
+                                    $global:selectedName = $selectedName; $global:selectedResult = $result; $tempSelect = $false }
                 {$_ -in "n", "q"} { $tempSelect = $false }
             }
             Clear-Host
@@ -237,7 +238,7 @@ function Terminal {
 function Invoke-WOL {
     $wolMode = $true
     while ($wolMode -eq $true) {
-        if ($recentMode -eq $true) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC } else { "NO MAC ADDRESS" } }
+        if ($recentMode -eq $true) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS" } }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
         if ($mac -eq $null -or $mac -eq '') { $wolMode = $false }
         else {
@@ -245,10 +246,10 @@ function Invoke-WOL {
             [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray  * 16)
             $udpClient = New-Object System.Net.Sockets.UdpClient
             $udpClient.Connect(([System.Net.IPAddress]::Broadcast),7)
-            $udpClient.Send($MagicPacket,$MagicPacket.Length)
+            $udpResult = $udpClient.Send($MagicPacket,$MagicPacket.Length)
             $udpClient.Close()
-            Write-Host "$mac --- $macByteArray"
-            Start-Sleep -Milliseconds 1800
+            Write-Host "$udpResult | $mac --- $macByteArray"
+            Start-Sleep -Milliseconds 1000
             if ($recentMode -eq $true) { $wolMode = $false }
         }
     }
