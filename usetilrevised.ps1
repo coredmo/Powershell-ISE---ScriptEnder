@@ -25,7 +25,7 @@ The Help Menu:
 help | h: List this menu
 
 terminal |  term |  t: Start-Process cmd.exe or powershell.exe
-search   |  ad   |  s: Search your PC's active directory computer descriptions and query for MAC addresses
+search   |  ad   |  a: Search your PC's active directory computer descriptions and query for MAC addresses
 wake     |  wol  |  w: Send a magic packet to a MAC Address, UDP via port 7
 ping     |          p: Ping a selected host in 3 different modes
 exprs    |         rs: Restart and open Windows Explorer
@@ -255,68 +255,162 @@ function Invoke-WOL {
     }
 }
 
+function Invoke-Shutdown {
+        # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode
+    if (-not $parameter) { 
+        if (-not $recentMode) { do {
+            $mainIP = Read-Host "- Computer Power Utility - Enter an IP or leave it blank to return to command-line -`n>" # FIX THIS IDK WHAT'S WRONG
+            if (-not $mainIP) { $mainIP = "notnull"; $option = $false }
+        } while (-not $mainIP) } else { $mainIP = $selectedName }
+    } else { $mainIP = $parameter }
+    if (-not $option) { Clear-Host; continue }
+
+        # Loop an error message until $choice becomes one of the $eValues
+    $time = 0
+    do {
+        $eValues = @('a', 'b', 'e')
+        Write-Host "Selected '$mainIP'`n`nWhat type of shutdown?`nA - Full Restart in $time seconds | B - Full Shutdown in $time seconds | C - Configure | E - Exit"
+        $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+
+        if ($choice -ieq "c") {
+                $selecting = $true
+                Clear-Host
+                while ($selecting) {
+                    Write-Host "Press 'S' to toggle /soft mode - Press 'T' to edit shutdown timer - Press 'C' to leave a message | 'E' - Return to shutdown selection"
+                    $choice2 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character; Clear-Host
+                    switch ($choice2) {
+                        "s" { if (-not $softMode) { "/soft will be included"; $softMode = $true } else { "/soft will NOT be included"; $softMode = $false }}
+
+                        "t" { "Enter an amount of seconds | a number between 0-315360000 (10 Years)"; $timeSelect = $true
+                                # While the $time input isn't a number between 0-315360000, display an error
+                            while ($timeSelect) {
+                                $time = Read-Host ">"; $time -as [int]
+                                if ($userInput -ne $null -and $userInput -ge 0 -and $userInput -le 315360000) {
+                                    $timeSelect = $false
+                                } else {
+                                    $host.UI.RawUI.ForegroundColor = "Red"
+                                    Write-Host "Invalid input. Please enter a number between 0 and 315360000."
+                                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                                }
+                            }
+                            continue
+                        }
+
+                        "c" { "Enter a message, leave it blank to disable message mode"; $message = Read-Host ">"
+                                # The shutdown message length has a max of 512 characters, display an error if it exceeds it. Exit and disable message mode if blank
+                            if ($message.Length -gt 512) {
+                                $host.UI.RawUI.ForegroundColor = "Red"
+                                Write-Host "Invalid input. The text must be under 512 characters"
+                                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                            } elseif (-not $message) { $messageMode = $false } else { $messageMode = $true }}
+
+                        "e" { $selecting = $false }
+                    }
+                }
+                continue
+            }
+
+        if ($eValues -notcontains $choice) {
+            [System.Console]::Clear();
+            $host.UI.RawUI.ForegroundColor = "Red"
+            Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        }
+    } while ($eValues -notcontains $choice)
+
+    $choosing = $true
+    while ($choosing) {
+        switch ($choice) {
+            "e" { $global:clear = $true; $choosing = $false; continue }
+            "a" { "Are you sure you want to go through with the $time second Restart? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                switch ($choice3) {
+                    "y" {
+                        if ($softMode) {
+                            if ($messageMode) {
+                                Read-Host "1"#shutdown /f /r /t $time /c $message /safe /m $mainIP
+                            } else { Read-Host "2"#shutdown /f /r /t $time /safe /m $mainIP }
+                        }} else {
+                            if ($messageMode) {
+                                Read-Host "3"#shutdown /f /r /t $time /c $message /m $mainIP
+                            } else { Read-Host "4"#shutdown /f /r /t $time /m $mainIP }
+                        }}
+                    }
+                    "n" { $choosing = $false }
+                }
+            }
+            "b" { "Are you sure you want to go through with the $time second Shutdown? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                switch ($choice3) {
+                    "y" { if ($softMode) {
+                            if ($messageMode) {
+                                Read-Host "5"#shutdown /f /s /t $time /c $message /safe /m $mainIP
+                            } else { Read-Host "6"#shutdown /f /s /t $time /safe /m $mainIP }
+                        }} else {
+                            if ($messageMode) {
+                                Read-Host "7"#shutdown /f /s /t $time /c $message /m $mainIP
+                            } else { Read-Host "8"#shutdown /f /s /t $time /m $mainIP }
+                        }}
+                    }
+                    "n" { $choosing = $false }
+                }
+            }
+        }
+        Clear-Host
+        if (-not $choice3) {
+            $host.UI.RawUI.ForegroundColor = "Red"
+            Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        }
+    }
+}
+
     # Run a simple group policy update
 function Group-Policy {
     Write-Host "Running Group Policy Update"
     gpupdate
-    Write-Host "Press any key to continue..."
-    [System.Console]::ReadKey().Key
+    Write-Host "Press any key to continue..."p
 }
 
     # Ping a selected host in different modes
 function Ping-Interface {
     $pingOption = $true
-    while ($pingOption -eq $true) {
-        if ($recentMode -eq $false) { 
-            do {
+    while ($pingOption) {
+        
+            # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode
+        if (-not $parameter) { 
+            if (-not $recentMode) { do {
                 $pingIP = Read-Host "- Ping utility - Enter an IP or leave it blank to return to command-line -`n>"
-                if (-not $pingIP) {
-                    $pingIp = "notnull"; $pingOption = $false
-                }
-            } while (-not $pingIP) 
-        } else { $pingIP = $selectedName }
-
-        if ($pingOption -eq $false) { continue }
-    
+                if (-not $pingIP) { $pingIp = "notnull"; $pingOption = $false }
+            } while (-not $pingIP) } else { $pingIP = $selectedName }
+        } else { $pingIP = $parameter }
+        if (-not $pingOption) { continue }
+        
+            # Loop an error message until $choice becomes one of the $eValues
         do {
             $eValues = @('a', 'b', 'e')
             Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - 1 attempts | B - Indefinite | E - Exit"
-            $n = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-            if ($eValues -notcontains $n) {
+            $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+            if ($eValues -notcontains $choice) {
                 [System.Console]::Clear();
                 $host.UI.RawUI.ForegroundColor = "Red"
                 Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
             }
-        } while ($eValues -notcontains $n)
+        } while ($eValues -notcontains $choice)
+       
+            # 'e' exits ping mode, 'a' runs the $pingResult a single time, and 'b' opens a prompt with an infinite ping | $n is the choice
+        switch ($choice) {
+            "e" { $global:clear = $true; return }
+            "a" { $n = 1 }
+            "b" { $constPing = $true }
+        } if (-not $constPing) { $pingResult = ping -n $n $pingIP } elseif ($constPing) { $constPing = $false; Start-Process cmd.exe -ArgumentList "/c ping -t $pingIP" }
+                
         [System.Console]::Clear()
-        $host.UI.RawUI.ForegroundColor = "Yellow"
-        Write-Host "Processing Ping..."
-        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        ping -n 1 $pingIP
         
-        if ($n -ieq "e") { break }
-        elseif ($n -ieq "a") { $n = 1 }
-        elseif ($n -ieq "b") { $constPing = $true } else { $pingResult = ping -n $n $pingIP }
-    
-        if ($constPing -eq $true) { Write-Host "`nPress C at any point to cancel`n" }
-        while ($constPing -eq $true) {
-            $pingResult = ping -n 1 $pingIP
-            "$pingResult`n"
-            Start-Sleep -Milliseconds 500
-            if ([System.Console]::KeyAvailable -and [System.Console]::ReadKey().Key -eq "C") {
-                Write-Host " > Abort button pressed:`nPress any key to continue"
-                [System.Console]::ReadKey().Key
-                $constPing = $false
-            }
-        }
-    
-        [System.Console]::Clear()
-        $pingResult
-    
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "`nPress any key to restart or press C to return to the console"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
-    
+        
         $cancel = [System.Console]::ReadKey().Key
         [System.Console]::Clear()
         if ($cancel -ieq "c") { $pingOption = $null }
@@ -328,10 +422,15 @@ function Ping-Interface {
 
 while ($choosing) {
     $correct = $false
+    $parameter = $null
 
     # Read a command from a user and split it if they add extra parameters
     Write-Host "`nType a command or 'help' for a list of commands"
-    if ($recentMode -eq $true) { Write-Host " - Selected Host: $selectedName - Enter 'e' to disable"; " - " + $selectedResult.Description }
+    if ($recentMode -eq $true) { 
+        $host.UI.RawUI.ForegroundColor = "Yellow"
+        Write-Host " - Selected Host: $selectedName - Enter 'e' to disable"; " - " + $selectedResult.Description 
+        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+    }
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
     if ($choice -ieq "a command") { C; ":D" }
@@ -339,12 +438,12 @@ while ($choosing) {
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     $parameter = $tokens[1]
-
+    
     switch ($choice) { 
 
         {$_ -in "help", "h"} { C; Help }
 
-        {$_ -in "ad", "search", "s"} { C; Scan-Create }
+        {$_ -in "ad", "search", "a"} { C; Scan-Create }
 
         {$_ -in "recents", "recent", "rec", "r"} { C; Invoke-Recents }
 
@@ -356,6 +455,8 @@ while ($choosing) {
 
         {$_ -in "terminal","term","t"} { C; Terminal }
 
+        {$_ -in "computer","comp","c"} { C; Invoke-Shutdown }
+
         {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
 
         {$_ -in "e", "d"} { C; if ($recentMode -eq $true) { $recentMode = $false; "Disabled Recent Mode" } }
@@ -363,6 +464,7 @@ while ($choosing) {
     }
 
     if ($correct -eq $true) {
+        if ($clear) { $clear = $false; Clear-Host }
         continue
     } else {
         Clear-Host
