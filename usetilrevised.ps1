@@ -234,6 +234,17 @@ function Terminal {
     exit
 }
 
+
+    # Run a simple group policy update
+function Group-Policy {
+    Write-Host "Running Group Policy Update"
+    gpupdate
+    Write-Host "Press any key to continue..."p
+}
+    #endregion
+
+    # Parameter included Utilities
+        #region
     # Send a magic packet to a MAC Address, UDP via port 7
 function Invoke-WOL {
     $wolMode = $true
@@ -255,6 +266,8 @@ function Invoke-WOL {
     }
 }
 
+
+    # Send a shutdown or restart command to a selected user's computer
 function Invoke-Shutdown {
         # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode
     if (-not $parameter) { 
@@ -296,7 +309,6 @@ function Invoke-Shutdown {
                                     $host.UI.RawUI.ForegroundColor = $orig_fg_color
                                 }
                             }
-                            continue
                         }
 
                         "c" { "Enter a message, leave it blank to disable message mode"; $message = Read-Host ">"
@@ -331,11 +343,11 @@ function Invoke-Shutdown {
                         if ($softMode) {
                             if ($messageMode) {
                                 shutdown /f /r /t $time /c $message /safe /m $mainIP; $choosing = $false; "Restarted with /safe and message in $time seconds"
-                            } else { shutdown /f /r /t $time /safe /m $mainIP; $choosing = $false; "Restarted with /safe in $time seconds"}
+                            } else { shutdown /f /r /t $time /safe /m $mainIP; $choosing = $false; "Restarted with /safe in $time seconds" }
                         } else {
                             if ($messageMode) {
                                 shutdown /f /r /t $time /c $message /m $mainIP; $choosing = $false; "Restarted with message in $time seconds"
-                            } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds"}
+                            } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
                         }
                     }
 
@@ -344,15 +356,16 @@ function Invoke-Shutdown {
             }
             "b" { "Are you sure you want to go through with the $time second Shutdown? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
-                    {$_ -in "y","e"} { if ($softMode) {
+                    {$_ -in "y","e"} {
+                        if ($softMode) {
                             if ($messageMode) {
                                 shutdown /f /s /t $time /c $message /safe /m $mainIP; $choosing = $false; "Shutdown with /safe and message in $time seconds"
                             } else { shutdown /f /s /t $time /safe /m $mainIP; $choosing = $false; "Shutdown with /safe in $time seconds"}
-                        }} else {
+                        } else {
                             if ($messageMode) {
                                 shutdown /f /s /t $time /c $message /m $mainIP; $choosing = $false; "Shutdown with message in $time seconds"
                             } else { shutdown /f /s /t $time /m $mainIP; $choosing = $false; "Shutdown in $time seconds"}
-                        }}
+                        }
                     }
 
                     {$_ -in "n","q"} { $choosing = $false }
@@ -368,12 +381,6 @@ function Invoke-Shutdown {
     }
 }
 
-    # Run a simple group policy update
-function Group-Policy {
-    Write-Host "Running Group Policy Update"
-    gpupdate
-    Write-Host "Press any key to continue..."p
-}
 
     # Ping a selected host in different modes
 function Ping-Interface {
