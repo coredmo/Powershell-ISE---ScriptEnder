@@ -260,13 +260,14 @@ function Invoke-Shutdown {
     if (-not $parameter) { 
         if (-not $recentMode) { do {
             $mainIP = Read-Host "- Computer Power Utility - Enter an IP or leave it blank to return to command-line -`n>" # FIX THIS IDK WHAT'S WRONG
-            if (-not $mainIP) { $mainIP = "notnull"; $option = $false }
+            if (-not $mainIP) { $option = $false }
         } while (-not $mainIP) } else { $mainIP = $selectedName }
     } else { $mainIP = $parameter }
-    if (-not $option) { Clear-Host; continue }
+    if ($option -eq $false) { Clear-Host; continue }
 
         # Loop an error message until $choice becomes one of the $eValues
     $time = 0
+    Clear-Host
     do {
         $eValues = @('a', 'b', 'e')
         Write-Host "Selected '$mainIP'`n`nWhat type of shutdown?`nA - Full Restart in $time seconds | B - Full Shutdown in $time seconds | C - Configure | E - Exit"
@@ -276,17 +277,19 @@ function Invoke-Shutdown {
                 $selecting = $true
                 Clear-Host
                 while ($selecting) {
-                    Write-Host "Press 'S' to toggle /soft mode - Press 'T' to edit shutdown timer - Press 'C' to leave a message | 'E' - Return to shutdown selection"
+                    Write-Host "- Press 'S' to toggle /soft mode`n- Press 'T' to edit shutdown timer`n- Press 'C' to leave a message`n- 'E' - Return to shutdown selection"
                     $choice2 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character; Clear-Host
                     switch ($choice2) {
                         "s" { if (-not $softMode) { "/soft will be included"; $softMode = $true } else { "/soft will NOT be included"; $softMode = $false }}
 
-                        "t" { "Enter an amount of seconds | a number between 0-315360000 (10 Years)"; $timeSelect = $true
+                        "t" { "Enter an amount of seconds | a number between 0-315360000 (10 Years)"
                                 # While the $time input isn't a number between 0-315360000, display an error
+                            $timeSelect = $true
                             while ($timeSelect) {
-                                $time = Read-Host ">"; $time -as [int]
-                                if ($userInput -ne $null -and $userInput -ge 0 -and $userInput -le 315360000) {
-                                    $timeSelect = $false
+                                $input = Read-Host ">"
+                                $time = $input -as [int]
+                                if ($time -ne $null -and $input -match '^\d+$' -and $time -ge 0 -and $time -le 315360000) {
+                                    $timeSelect = $false; Write-Host "Set to $time second shutdown"
                                 } else {
                                     $host.UI.RawUI.ForegroundColor = "Red"
                                     Write-Host "Invalid input. Please enter a number between 0 and 315360000."
@@ -302,7 +305,7 @@ function Invoke-Shutdown {
                                 $host.UI.RawUI.ForegroundColor = "Red"
                                 Write-Host "Invalid input. The text must be under 512 characters"
                                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                            } elseif (-not $message) { $messageMode = $false } else { $messageMode = $true }}
+                            } elseif (-not $message) { "Message not enabled"; $messageMode = $false } else { "Message Enabled"; $messageMode = $true }}
 
                         "e" { $selecting = $false }
                     }
@@ -324,33 +327,35 @@ function Invoke-Shutdown {
             "e" { $global:clear = $true; $choosing = $false; continue }
             "a" { "Are you sure you want to go through with the $time second Restart? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
-                    "y" {
+                    {$_ -in "y","e"} {
                         if ($softMode) {
                             if ($messageMode) {
-                                Read-Host "1"#shutdown /f /r /t $time /c $message /safe /m $mainIP
-                            } else { Read-Host "2"#shutdown /f /r /t $time /safe /m $mainIP }
-                        }} else {
+                                shutdown /f /r /t $time /c $message /safe /m $mainIP; $choosing = $false; "Restarted with /safe and message in $time seconds"
+                            } else { shutdown /f /r /t $time /safe /m $mainIP; $choosing = $false; "Restarted with /safe in $time seconds"}
+                        } else {
                             if ($messageMode) {
-                                Read-Host "3"#shutdown /f /r /t $time /c $message /m $mainIP
-                            } else { Read-Host "4"#shutdown /f /r /t $time /m $mainIP }
-                        }}
+                                shutdown /f /r /t $time /c $message /m $mainIP; $choosing = $false; "Restarted with message in $time seconds"
+                            } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds"}
+                        }
                     }
-                    "n" { $choosing = $false }
+
+                    {$_ -in "n","q"} { $choosing = $false }
                 }
             }
             "b" { "Are you sure you want to go through with the $time second Shutdown? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
-                    "y" { if ($softMode) {
+                    {$_ -in "y","e"} { if ($softMode) {
                             if ($messageMode) {
-                                Read-Host "5"#shutdown /f /s /t $time /c $message /safe /m $mainIP
-                            } else { Read-Host "6"#shutdown /f /s /t $time /safe /m $mainIP }
+                                shutdown /f /s /t $time /c $message /safe /m $mainIP; $choosing = $false; "Shutdown with /safe and message in $time seconds"
+                            } else { shutdown /f /s /t $time /safe /m $mainIP; $choosing = $false; "Shutdown with /safe in $time seconds"}
                         }} else {
                             if ($messageMode) {
-                                Read-Host "7"#shutdown /f /s /t $time /c $message /m $mainIP
-                            } else { Read-Host "8"#shutdown /f /s /t $time /m $mainIP }
+                                shutdown /f /s /t $time /c $message /m $mainIP; $choosing = $false; "Shutdown with message in $time seconds"
+                            } else { shutdown /f /s /t $time /m $mainIP; $choosing = $false; "Shutdown in $time seconds"}
                         }}
                     }
-                    "n" { $choosing = $false }
+
+                    {$_ -in "n","q"} { $choosing = $false }
                 }
             }
         }
