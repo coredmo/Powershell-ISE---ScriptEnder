@@ -25,9 +25,11 @@ The Help Menu:
 help | h: List this menu
 
 terminal |  term |  t: Start-Process cmd.exe or powershell.exe
-search   |  ad   |  a: Search your PC's active directory computer descriptions and query for MAC addresses
-wake     |  wol  |  w: Send a magic packet to a MAC Address, UDP via port 7
-ping     |          p: Ping a selected host in 3 different modes
+search   |  ad   |  a: Search your active directory's computer descriptions and save objects to a recents list
+recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
+wake     |  wol  |  w: Send a magic packet to a MAC Address, UDP via port 7 (Recent compatible)
+shutdown | shut  |  s: Restart a selected host using the shutdown command (Recent compatible)
+ping     |          p: Ping a selected host in 3 different modes (Recent compatible)
 exprs    |         rs: Restart and open Windows Explorer
 gpupdate |  gpu  | gp: Run a simple forced group policy update
 
@@ -212,7 +214,7 @@ function Invoke-Recents {
     # Start-Process cmd.exe or powershell.exe
 function Terminal {
     $folderPath = "C:\users\$username"
-    Write-Host "Do you want to start the instance in Administrator? Y or E - Yes"
+    Write-Host "Do you want to start the instance in Administrator? Y - Yes | N - No"
     $tchoose1 = [System.Console]::ReadKey().Key
     [System.Console]::Clear()
     
@@ -220,11 +222,11 @@ function Terminal {
     $tchoose2 = [System.Console]::ReadKey().Key
     [System.Console]::Clear()
     
-    if ($tchoose2 -ieq "e") {
+    if ($tchoose2 -ieq "e" -or $tchoose2 -ieq "y") {
         if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs -WorkingDirectory $folderPath }
         else { Start-Process cmd.exe -WorkingDirectory $folderPath }
     } 
-    elseif ($tchoose2 -ieq "q") {
+    elseif ($tchoose2 -ieq "q" -or $tchoose2 -ieq "n") {
         if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process powershell.exe -Verb RunAs -WorkingDirectory $folderPath }
         else { Start-Process powershell.exe -WorkingDirectory $folderPath }
     } 
@@ -454,7 +456,7 @@ while ($choosing) {
 
         {$_ -in "terminal","term","t"} { C; Terminal }
 
-        {$_ -in "computer","comp","c"} { C; Invoke-Shutdown }
+        {$_ -in "shutdown","shut","s","c"} { C; Invoke-Shutdown }
 
         {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
 
