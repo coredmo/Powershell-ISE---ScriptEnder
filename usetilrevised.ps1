@@ -267,7 +267,7 @@ function Invoke-WOL {
 }
 
 
-    # Send a shutdown or restart command to a selected user's computer
+    # Send a shutdown or restart command to a selected user's computer (could be better)
 function Invoke-Shutdown {
         # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode
     if (-not $parameter) { 
@@ -286,15 +286,14 @@ function Invoke-Shutdown {
         Write-Host "Selected '$mainIP'`n`nWhat type of shutdown?`nA - Full Restart in $time seconds | B - Full Shutdown in $time seconds | C - Configure | E - Exit"
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
+            # Loop an error message until t, c, or e is pressed. Then loop errors when $input isn't a valid number or when $message isn't less than 512 characters (messages may have more restrictions)
         if ($choice -ieq "c") {
                 $selecting = $true
                 Clear-Host
                 while ($selecting) {
-                    Write-Host "- Press 'S' to toggle /soft mode`n- Press 'T' to edit shutdown timer`n- Press 'C' to leave a message`n- 'E' - Return to shutdown selection"
+                    Write-Host "- Press 'T' to edit shutdown timer`n- Press 'C' to leave a message`n- 'E' - Return to shutdown selection"
                     $choice2 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character; Clear-Host
                     switch ($choice2) {
-                        "s" { if (-not $softMode) { "/soft will be included"; $softMode = $true } else { "/soft will NOT be included"; $softMode = $false }}
-
                         "t" { "Enter an amount of seconds | a number between 0-315360000 (10 Years)"
                                 # While the $time input isn't a number between 0-315360000, display an error
                             $timeSelect = $true
@@ -340,35 +339,23 @@ function Invoke-Shutdown {
             "a" { "Are you sure you want to go through with the $time second Restart? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
                     {$_ -in "y","e"} {
-                        if ($softMode) {
-                            if ($messageMode) {
-                                shutdown /f /r /t $time /c $message /safe /m $mainIP; $choosing = $false; "Restarted with /safe and message in $time seconds"
-                            } else { shutdown /f /r /t $time /safe /m $mainIP; $choosing = $false; "Restarted with /safe in $time seconds" }
-                        } else {
-                            if ($messageMode) {
-                                shutdown /f /r /t $time /c $message /m $mainIP; $choosing = $false; "Restarted with message in $time seconds"
-                            } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
-                        }
+                        if ($messageMode) {
+                            shutdown /f /r /t $time /c $message /m $mainIP; $choosing = $false; "Restarted with message in $time seconds"
+                        } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
                     }
 
-                    {$_ -in "n","q"} { $choosing = $false }
+                    {$_ -in "n","q"} { Read-Host "RAHHH";$choosing = $false }
                 }
             }
             "b" { "Are you sure you want to go through with the $time second Shutdown? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
                     {$_ -in "y","e"} {
-                        if ($softMode) {
-                            if ($messageMode) {
-                                shutdown /f /s /t $time /c $message /safe /m $mainIP; $choosing = $false; "Shutdown with /safe and message in $time seconds"
-                            } else { shutdown /f /s /t $time /safe /m $mainIP; $choosing = $false; "Shutdown with /safe in $time seconds"}
-                        } else {
-                            if ($messageMode) {
-                                shutdown /f /s /t $time /c $message /m $mainIP; $choosing = $false; "Shutdown with message in $time seconds"
-                            } else { shutdown /f /s /t $time /m $mainIP; $choosing = $false; "Shutdown in $time seconds"}
-                        }
+                        if ($messageMode) {
+                            shutdown /f /r /t $time /c $message /m $mainIP; $choosing = $false; "Restarted with message in $time seconds"
+                        } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
                     }
 
-                    {$_ -in "n","q"} { $choosing = $false }
+                    {$_ -in "n","q"} { Read-Host "RAHHH";$choosing = $false }
                 }
             }
         }
@@ -387,7 +374,7 @@ function Ping-Interface {
     $pingOption = $true
     while ($pingOption) {
         
-            # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode
+            # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode (could be better)
         if (-not $parameter) { 
             if (-not $recentMode) { do {
                 $pingIP = Read-Host "- Ping utility - Enter an IP or leave it blank to return to command-line -`n>"
