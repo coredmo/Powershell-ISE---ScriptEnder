@@ -334,12 +334,16 @@ Write-Host "Q: Quit without saving"
             Start-Sleep -Milliseconds 1000
             $correct = $true
             while ($true) { 
-                Write-Host "Press any key to enter the debug section..."
+                Write-Host "Press A-debug or B-fibba"
                 $choose = [System.Console]::ReadKey().Key
                 [System.Console]::Clear()
-                $option = "debug"
-                break
-            }
+                if ($choose -ieq "a") {
+                    $option = "debug"
+                    break
+                } elseif ($choose -ieq "b") {
+                    $option = "fibba" 
+                    break
+            } Clear-Host }
         }
     }
 
@@ -352,6 +356,29 @@ Write-Host "Q: Quit without saving"
     $host.UI.RawUI.ForegroundColor = "Red"
     Write-Host "Please input an actual command or follow the latter half of these here instructions"
     $host.UI.RawUI.ForegroundColor = $orig_fg_color
+}
+
+while ($option -eq "fibba") {
+    Write-Host "`nDebug & test section 1"
+    Write-Host "`nPress any key to start the Fibonacci Mode..."
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    Clear-Host
+    # Fib(b)onacci Mode
+    $fib = 1
+    $bon = 0
+    while ($true) {
+        "`nFibonacci Mode: Active`nPress C to cancel`n"
+        $acci = $fib + $bon
+        $fib = $bon
+        $bon = $acci
+        $host.UI.RawUI.ForegroundColor = "Green"
+        "     $acci"
+        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        Start-Sleep -Milliseconds 500
+        Clear-Host
+        if ([System.Console]::KeyAvailable -and [System.Console]::ReadKey().Key -eq "C") { [System.Console]::Clear(); break }
+    }
+    Start-Sleep -Milliseconds 500
 }
 
 while ($option -eq "debug") {
