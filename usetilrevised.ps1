@@ -11,6 +11,8 @@ $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
 $username = $parts[-1] # Gets the current users name and strips its domain name
 
+$folderPath = "C:\users\$username"
+
 $orig_fg_color = $host.UI.RawUI.ForegroundColor
 
     # Ignores error handling
@@ -60,9 +62,8 @@ function Scan-Create {
 
             # Select Ping Mode
         switch ($adInput) {
-            {$_ -in "y", "e"} {
-                $pingConfig = $true; $adLoop = $false; [System.Console]::Clear(); "Pinging each selected host"
-            } {$_ -in "n", "q"} { $pingConfig = $false; $adLoop = $false; [System.Console]::Clear(); "Skipping ping function" }
+            {$_ -in "y", "e"} { $pingConfig = $true; $adLoop = $false; [System.Console]::Clear(); "Pinging each selected host" }
+            {$_ -in "n", "q"} { $pingConfig = $false; $adLoop = $false; [System.Console]::Clear(); "Skipping ping function" }
         }
         Clear-Host
     }
@@ -70,7 +71,8 @@ function Scan-Create {
             
             # adRecents is is enabled if you have previously saved a unitList (Recents list)
         if ($adRecents -eq $true -and $recents.Count -gt 0) { 
-            $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+            $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        }
 
         Write-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -"
         $input = Read-Host "You can press 'c' while its querying to abort the process`n>"
@@ -213,7 +215,6 @@ function Invoke-Recents {
         #region
     # Start-Process cmd.exe or powershell.exe
 function Terminal {
-    $folderPath = "C:\users\$username"
     Write-Host "Do you want to start the instance in Administrator? Y - Yes | N - No"
     $tchoose1 = [System.Console]::ReadKey().Key
     [System.Console]::Clear()
@@ -250,11 +251,11 @@ function Group-Policy {
     # Send a magic packet to a MAC Address, UDP via port 7
 function Invoke-WOL {
     $wolMode = $true
-    while ($wolMode -eq $true) {
+    while ($wolMode) {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
         elseif ($recentMode -eq $true) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS" } }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
-        if ($mac -eq $null -or $mac -eq '') { $wolMode = $false }
+        if ($mac -notmatch $macRegEx) { $wolMode = $false; Clear-Host; continue }
         else {
             $macByteArray = $mac -split "[:-]" | ForEach-Object { [Byte] "0x$_"}
             [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray  * 16)
@@ -292,7 +293,7 @@ function Invoke-Shutdown {
         if ($messageMode) { "Message: '$message'" }
 @"
 `nSelected '$mainIP'`n`nWhat type of shutdown?`nA - Full Restart in $time seconds | B - Full Shutdown in $time seconds
-C - Configure | D - Send a shutdown cancel command | E - Exit 
+C - Configure | D - Send a shutdown cancel command | P - Ping the selected host | E - Exit 
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
@@ -334,6 +335,8 @@ C - Configure | D - Send a shutdown cancel command | E - Exit
                 }
                 continue
             }
+
+        if ($choice -ieq "p") { Clear-Host; Test-Connection -ComputerName $mainIP; $choice = $null; continue }
 
         if ($eValues -notcontains $choice) {
             [System.Console]::Clear();
@@ -446,12 +449,16 @@ while ($choosing) {
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
     if ($choice -ieq "a command") { C; ":D"; continue }
+    #if ($choice -ieq "q") { C; "No"; continue }
     
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     $parameter = $tokens[1]
     
     switch ($choice) { 
+
+        #{$_ -in "pw"} { C; 
+            #Start-Process powershell.exe "& '@'" -WorkingDirectory $folderPath }
 
         {$_ -in "help", "h"} { C; Help }
 
