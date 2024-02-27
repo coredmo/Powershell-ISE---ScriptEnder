@@ -251,7 +251,8 @@ function Group-Policy {
 function Invoke-WOL {
     $wolMode = $true
     while ($wolMode -eq $true) {
-        if ($recentMode -eq $true) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS" } }
+        if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
+        elseif ($recentMode -eq $true) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS" } }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
         if ($mac -eq $null -or $mac -eq '') { $wolMode = $false }
         else {
@@ -263,7 +264,7 @@ function Invoke-WOL {
             $udpClient.Close()
             Write-Host "$udpResult | $mac --- $macByteArray"
             Start-Sleep -Milliseconds 1000
-            if ($recentMode -eq $true) { $wolMode = $false }
+            if ($recentMode -or $parameterMode) { $wolMode = $false }
         }
     }
 }
@@ -273,19 +274,26 @@ function Invoke-WOL {
 function Invoke-Shutdown {
         # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode
     if (-not $parameter) { 
-        if (-not $recentMode) { do {
-            $mainIP = Read-Host "- Computer Power Utility - Enter an IP or leave it blank to return to command-line -`n>" # FIX THIS IDK WHAT'S WRONG
-            if (-not $mainIP) { $option = $false }
-        } while (-not $mainIP) } else { $mainIP = $selectedName }
-    } else { $mainIP = $parameter }
+        if (-not $recentMode) {
+            $option = $true
+            do {
+                Clear-Host; $mainIP = Read-Host "- Computer Power Utility - Enter an IP or leave it blank to return to command-line -`n>"
+                if (-not $mainIP) { $option = $false }
+            } while (-not $mainIP -and $option) } else { $mainIP = $selectedName }
+        } else { $mainIP = $parameter }
     if ($option -eq $false) { Clear-Host; continue }
 
         # Loop an error message until $choice becomes one of the $eValues
     $time = 0
     Clear-Host
     do {
-        $eValues = @('a', 'b', 'e')
-        Write-Host "Selected '$mainIP'`n`nWhat type of shutdown?`nA - Full Restart in $time seconds | B - Full Shutdown in $time seconds | C - Configure | E - Exit"
+        $eValues = @('a', 'b', 'd', 'e')
+
+        if ($messageMode) { "Message: '$message'" }
+@"
+`nSelected '$mainIP'`n`nWhat type of shutdown?`nA - Full Restart in $time seconds | B - Full Shutdown in $time seconds
+C - Configure | D - Send a shutdown cancel command | E - Exit 
+"@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
             # Loop an error message until t, c, or e is pressed. Then loop errors when $input isn't a valid number or when $message isn't less than 512 characters (messages may have more restrictions)
@@ -296,15 +304,16 @@ function Invoke-Shutdown {
                     Write-Host "- Press 'T' to edit shutdown timer`n- Press 'C' to leave a message`n- 'E' - Return to shutdown selection"
                     $choice2 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character; Clear-Host
                     switch ($choice2) {
-                        "t" { "Enter an amount of seconds | a number between 0-315360000 (10 Years)"
-                                # While the $time input isn't a number between 0-315360000, display an error
+                        "t" { # While the $time input isn't a number between 0-315360000, display an error
                             $timeSelect = $true
                             while ($timeSelect) {
+                                "Enter an amount of seconds | a number between 0-315360000 (10 Years)"
                                 $input = Read-Host ">"
                                 $time = $input -as [int]
                                 if ($time -ne $null -and $input -match '^\d+$' -and $time -ge 0 -and $time -le 315360000) {
                                     $timeSelect = $false; Write-Host "Set to $time second shutdown"
                                 } else {
+                                    Clear-Host
                                     $host.UI.RawUI.ForegroundColor = "Red"
                                     Write-Host "Invalid input. Please enter a number between 0 and 315360000."
                                     $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -314,9 +323,9 @@ function Invoke-Shutdown {
 
                         "c" { "Enter a message, leave it blank to disable message mode"; $message = Read-Host ">"
                                 # The shutdown message length has a max of 512 characters, display an error if it exceeds it. Exit and disable message mode if blank
-                            if ($message.Length -gt 512) {
+                            if ($message.Length -gt 512) { $messageMode = $false
                                 $host.UI.RawUI.ForegroundColor = "Red"
-                                Write-Host "Invalid input. The text must be under 512 characters"
+                                Write-Host "Disabled Message | Invalid input. The text must be under 512 characters"
                                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
                             } elseif (-not $message) { "Message not enabled"; $messageMode = $false } else { "Message Enabled"; $messageMode = $true }}
 
@@ -333,11 +342,12 @@ function Invoke-Shutdown {
             $host.UI.RawUI.ForegroundColor = $orig_fg_color
         }
     } while ($eValues -notcontains $choice)
-
+    Clear-Host
     $choosing = $true
     while ($choosing) {
         switch ($choice) {
             "e" { $global:clear = $true; $choosing = $false; continue }
+            "d" { shutdown /a /m $mainIP; "Sent a shutdown cancel command to $mainIP"; $choosing = $false; continue }
             "a" { "Are you sure you want to go through with the $time second Restart? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
                     {$_ -in "y","e"} {
@@ -346,7 +356,7 @@ function Invoke-Shutdown {
                         } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
                     }
 
-                    {$_ -in "n","q"} { Read-Host "RAHHH";$choosing = $false }
+                    {$_ -in "n","q"} { $choosing = $false }
                 }
             }
             "b" { "Are you sure you want to go through with the $time second Shutdown? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
@@ -357,11 +367,11 @@ function Invoke-Shutdown {
                         } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
                     }
 
-                    {$_ -in "n","q"} { Read-Host "RAHHH";$choosing = $false }
+                    {$_ -in "n","q"} { $choosing = $false }
                 }
             }
         }
-        Clear-Host
+        
         if (-not $choice3) {
             $host.UI.RawUI.ForegroundColor = "Red"
             Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
@@ -378,11 +388,12 @@ function Ping-Interface {
         
             # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode (could be better)
         if (-not $parameter) { 
-            if (-not $recentMode) { do {
-                $pingIP = Read-Host "- Ping utility - Enter an IP or leave it blank to return to command-line -`n>"
-                if (-not $pingIP) { $pingIp = "notnull"; $pingOption = $false }
-            } while (-not $pingIP) } else { $pingIP = $selectedName }
-        } else { $pingIP = $parameter }
+            if (-not $recentMode) { 
+                do {
+                    $pingIP = Read-Host "- Ping utility - Enter an IP or leave it blank to return to command-line -`n>"
+                    if (-not $pingIP) { $pingIp = "notnull"; $pingOption = $false }
+                } while (-not $pingIP) } else { $pingIP = $selectedName }
+            } else { $pingIP = $parameter }
         if (-not $pingOption) { continue }
         
             # Loop an error message until $choice becomes one of the $eValues
@@ -434,7 +445,7 @@ while ($choosing) {
     }
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
-    if ($choice -ieq "a command") { C; ":D" }
+    if ($choice -ieq "a command") { C; ":D"; continue }
     
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
