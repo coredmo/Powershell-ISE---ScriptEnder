@@ -226,7 +226,6 @@ function Terminal {
         [System.Console]::Clear()
         if ($tchoose1 -in $tanswers) { break }
     }
-    Read-Host "Broke 1"
     
     while ($true) {
         Write-Host "Press E for cmd.exe or press Q for powershell.exe"
@@ -235,7 +234,6 @@ function Terminal {
         if ($tchoose2 -ieq "y" -or $tchoose2 -ieq "n") { continue }
         elseif ($tchoose2 -in $tanswers) { break }
     }
-    Read-Host "Broke 2"
 
     if ($tchoose2 -ieq "e" -or $tchoose2 -ieq "y") {
         if ($tchoose1 -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs -WorkingDirectory $folderPath; exit }
