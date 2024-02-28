@@ -254,7 +254,7 @@ function Terminal {
 function Group-Policy {
     Write-Host "Running Group Policy Update"
     gpupdate
-    Write-Host "Press any key to continue..."p
+    Write-Host "Press any key to continue..."
 }
     #endregion
 
