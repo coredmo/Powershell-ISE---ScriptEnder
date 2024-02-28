@@ -180,33 +180,37 @@ function Invoke-Recents {
 
             # Display the list in a grid view window and store the selected item
         $selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
-        $selectedTokens = $selectedUnit -split '-', 2; $selectedIP = $selectedTokens[0].Trim(); $selectedName = $selectedTokens[1].Trim()
         
-        $ipv4Result = nslookup $selectedIP
-        $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
-        if ($nsResultV4.Count -lt 2) { "" } else { $resultV4 = $nsResultV4[1]; $mac = arp -a | findstr "$resultV4" }
+        if (-not $selectedUnit) { "No Unit was selected" }
+        else {
+            $selectedTokens = $selectedUnit -split '-', 2; $selectedIP = $selectedTokens[0].Trim(); $selectedName = $selectedTokens[1].Trim()
 
-        Clear-Host
-        $result = Get-ADComputer -Identity "$selectedName" -Properties Description | Select-Object Name,Description
+            $ipv4Result = nslookup $selectedIP
+            $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
+            if ($nsResultV4.Count -lt 2) { "" } else { $resultV4 = $nsResultV4[1]; $mac = arp -a | findstr "$resultV4" }
 
-        $tempSelect = $true
-        Do {
-                # Display the name of the ad object and its description then display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
-            "`n"; $result.Name; $result.Description
-            if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
-            else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-            if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
-
-            Write-Host "Do you want to select this host as the primary unit? Y - N"
-            $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-            switch ($adInput) {
-                    # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
-                {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
-                                    $global:selectedName = $selectedName; $global:selectedResult = $result; $tempSelect = $false }
-                {$_ -in "n", "q"} { $tempSelect = $false }
-            }
             Clear-Host
-        } while ($tempSelect)
+            $result = Get-ADComputer -Identity "$selectedName" -Properties Description | Select-Object Name,Description
+
+            $tempSelect = $true
+            Do {
+                    # Display the name of the ad object and its description then display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
+                "`n"; $result.Name; $result.Description
+                if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
+                else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
+
+                Write-Host "Do you want to select this host as the primary unit? Y - N"
+                $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                switch ($adInput) {
+                        # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
+                    {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
+                                        $global:selectedName = $selectedName; $global:selectedResult = $result; $tempSelect = $false }
+                    {$_ -in "n", "q"} { $tempSelect = $false }
+                }
+                Clear-Host
+            } while ($tempSelect)
+        }
     }
 }
         #endregion
