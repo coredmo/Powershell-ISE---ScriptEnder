@@ -219,26 +219,36 @@ function Invoke-Recents {
         #region
     # Start-Process cmd.exe or powershell.exe
 function Terminal {
-    Write-Host "Do you want to start the instance in Administrator? Y - Yes | N - No"
-    $tchoose1 = [System.Console]::ReadKey().Key
-    [System.Console]::Clear()
+    $tanswers = @("y","n","e","q")
+    while ($true) {
+        Write-Host "Do you want to start the instance in Administrator? Y - Yes | N - No"
+        $tchoose1 = [System.Console]::ReadKey().Key
+        [System.Console]::Clear()
+        if ($tchoose1 -in $tanswers) { break }
+    }
+    Read-Host "Broke 1"
     
-    Write-Host "Press E for cmd.exe or press Q for powershell.exe"
-    $tchoose2 = [System.Console]::ReadKey().Key
-    [System.Console]::Clear()
-    
+    while ($true) {
+        Write-Host "Press E for cmd.exe or press Q for powershell.exe"
+        $tchoose2 = [System.Console]::ReadKey().Key
+        [System.Console]::Clear()
+        if ($tchoose2 -ieq "y" -or $tchoose2 -ieq "n") { continue }
+        elseif ($tchoose2 -in $tanswers) { break }
+    }
+    Read-Host "Broke 2"
+
     if ($tchoose2 -ieq "e" -or $tchoose2 -ieq "y") {
-        if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs -WorkingDirectory $folderPath }
-        else { Start-Process cmd.exe -WorkingDirectory $folderPath }
+        if ($tchoose1 -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs -WorkingDirectory $folderPath; exit }
+        else { Start-Process cmd.exe -WorkingDirectory $folderPath; exit }
     } 
     elseif ($tchoose2 -ieq "q" -or $tchoose2 -ieq "n") {
-        if ($choose -ieq "y" -or $tchoose1 -ieq "e") { Start-Process powershell.exe -Verb RunAs -WorkingDirectory $folderPath }
-        else { Start-Process powershell.exe -WorkingDirectory $folderPath }
+        if ($tchoose1 -ieq "y" -or $tchoose1 -ieq "e") { Start-Process powershell.exe -Verb RunAs -WorkingDirectory $folderPath; exit }
+        else { Start-Process powershell.exe -WorkingDirectory $folderPath; exit }
     } 
     else { $host.UI.RawUI.ForegroundColor = "Red"
         Write-Host "Invalid"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
     }
-    exit
+    Clear-Host
 }
 
 
