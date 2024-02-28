@@ -231,21 +231,21 @@ function Terminal {
         Write-Host "Press E for cmd.exe or press Q for powershell.exe"
         $tchoose2 = [System.Console]::ReadKey().Key
         [System.Console]::Clear()
-        if ($tchoose2 -ieq "y" -or $tchoose2 -ieq "n") { continue }
+        if ($tchoose2 -in "y","n") { continue }
         elseif ($tchoose2 -in $tanswers) { break }
     }
 
-    if ($tchoose2 -ieq "e" -or $tchoose2 -ieq "y") {
-        if ($tchoose1 -ieq "y" -or $tchoose1 -ieq "e") { Start-Process cmd.exe -Verb RunAs -WorkingDirectory $folderPath; exit }
-        else { Start-Process cmd.exe -WorkingDirectory $folderPath; exit }
-    } 
-    elseif ($tchoose2 -ieq "q" -or $tchoose2 -ieq "n") {
-        if ($tchoose1 -ieq "y" -or $tchoose1 -ieq "e") { Start-Process powershell.exe -Verb RunAs -WorkingDirectory $folderPath; exit }
-        else { Start-Process powershell.exe -WorkingDirectory $folderPath; exit }
-    } 
-    else { $host.UI.RawUI.ForegroundColor = "Red"
-        Write-Host "Invalid"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+    switch ($tchoose2) {
+        {$_ -in "e","y"} {
+            if ($tchoose1 -in 'e','y') { Start-Process cmd.exe -Verb RunAs -WorkingDirectory $folderPath; exit }
+            else { Start-Process cmd.exe -WorkingDirectory $folderPath; exit }
+        }
+        {$_ -in "q","n"} {
+            if ($tchoose1 -in 'e','y') { Start-Process powershell.exe -Verb RunAs -WorkingDirectory $folderPath; exit }
+            else { Start-Process powershell.exe -WorkingDirectory $folderPath; exit }
+        }
     }
+
     Clear-Host
 }
 
