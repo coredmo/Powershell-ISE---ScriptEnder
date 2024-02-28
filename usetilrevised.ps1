@@ -199,7 +199,7 @@ function Invoke-Recents {
                 if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
                 else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
                 if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
-
+                
                 Write-Host "Do you want to select this host as the primary unit? Y - N"
                 $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($adInput) {
@@ -257,7 +257,7 @@ function Invoke-WOL {
     $wolMode = $true
     while ($wolMode) {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
-        elseif ($recentMode -eq $true) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS" } }
+        elseif ($recentMode) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS"; $wolMode = $false; continue } }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
         if ($mac -notmatch $macRegEx) { $wolMode = $false; Clear-Host; continue }
         else {
