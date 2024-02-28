@@ -252,9 +252,31 @@ function Terminal {
 
     # Run a simple group policy update
 function Group-Policy {
-    Write-Host "Running Group Policy Update"
-    gpupdate
-    Write-Host "Press any key to continue..."
+    $gpMode = $true
+    while ($gpMode) {
+        $ganswers = @("u","r","e","q")
+        while ($true) {
+            Write-Host "U / E - Run a forced group policy update | R / Q - Displays RSoP summary data`n- Leave it blank to return to command line"
+            $gchoose = [System.Console]::ReadKey().Key
+            [System.Console]::Clear()
+            if ($gchoose -eq "Enter") { $exit = $true; break }
+            if ($gchoose -in $ganswers) { break }
+        } if ($exit) { $gpMode = $false; continue }
+
+        if ($gchoose -in "e","u") {
+            Write-Host "Running Group Policy Update"
+            gpupdate /Force
+            Write-Host "Press any key to continue..."
+        }
+
+        if ($gchoose -in "r","q") {
+            Write-Host "Running GPResult..."
+            gpresult /R
+            Write-Host "`nPress any key to continue..."
+        }
+        [System.Console]::ReadKey().Key
+        Clear-Host
+    }
 }
     #endregion
 
