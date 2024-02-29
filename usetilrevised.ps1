@@ -200,7 +200,6 @@ function Invoke-Recents {
             Clear-Host
             $result = Get-ADComputer -Identity "$selectedName" -Properties Description | Select-Object Name,Description
 
-            $tempSelect = $true
             Do {
                     # Display the name of the ad object and its description then display the mac if it exists.
                     # Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
@@ -214,11 +213,11 @@ function Invoke-Recents {
                 switch ($adInput) {
                         # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
                     {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
-                                        $global:selectedName = $selectedName; $global:selectedResult = $result; $tempSelect = $false }
-                    {$_ -in "n", "q"} { $tempSelect = $false }
+                                        $global:selectedName = $selectedName; $global:selectedResult = $result; break }
+                    {$_ -in "n", "q"} { break }
                 }
                 Clear-Host
-            } while ($tempSelect)
+            } while ($true)
         }
     }
 }
@@ -230,16 +229,18 @@ function Invoke-Recents {
 function Terminal {
     $tanswers = @("y","n","e","q")
     while ($true) {
-        Write-Host "Do you want to start the instance in Administrator? Y - Yes | N - No"
+        Write-Host "Do you want to start the instance in Administrator?`nY - Yes | N - No | Enter - Return to command line"
         $tchoose1 = [System.Console]::ReadKey().Key
         [System.Console]::Clear()
+        if ($tchoose1 -ieq "Enter") { return }
         if ($tchoose1 -in $tanswers) { break }
     }
     
     while ($true) {
-        Write-Host "Press E for cmd.exe or press Q for powershell.exe"
+        Write-Host "Press E for cmd.exe or press Q for powershell.exe`nEnter - Return to command line"
         $tchoose2 = [System.Console]::ReadKey().Key
         [System.Console]::Clear()
+        if ($tchoose2 -ieq "Enter") { return }
         if ($tchoose2 -in "y","n") { continue }
         elseif ($tchoose2 -in $tanswers) { break }
     }
@@ -261,8 +262,7 @@ function Terminal {
 
     # Run a simple forced group policy update or display the RSoP summary data
 function Group-Policy {
-    $gpMode = $true
-    while ($gpMode) {
+    while ($true) {
         $ganswers = @("u","r","e","q")
         while ($true) {
             Write-Host "U / E - Run a forced group policy update | R / Q - Displays RSoP summary data`n- Leave it blank to return to command line"
@@ -270,7 +270,7 @@ function Group-Policy {
             [System.Console]::Clear()
             if ($gchoose -eq "Enter") { $exit = $true; break }
             if ($gchoose -in $ganswers) { break }
-        } if ($exit) { $gpMode = $false; continue }
+        } if ($exit) { break }
 
         if ($gchoose -in "e","u") {
             Write-Host "Running Group Policy Update"
@@ -345,7 +345,8 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
-            # Loop an error message until t, c, or e is pressed. Then loop errors when $input isn't a valid number or when $message isn't less than 512 characters (messages may have more restrictions)
+            # Loop an error message until t, c, or e is pressed. Then loop errors when $input isn't a valid number or when $message isn't less than 512 characters
+            # (messages may have more restrictions)
         if ($choice -ieq "c") {
                 $selecting = $true
                 Clear-Host
@@ -394,12 +395,16 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
         }
     } while ($eValues -notcontains $choice)
     Clear-Host
+
+        # I'd like to remove the while ($choosing) and put a while ($true) (The switch statement makes break slightly tedious (I can prob just put an $exit))
     $choosing = $true
     while ($choosing) {
         switch ($choice) {
             "e" { $global:clear = $true; $choosing = $false; continue }
             "d" { shutdown /a /m $mainIP; "Sent a shutdown cancel command to $mainIP"; $choosing = $false; continue }
-            "a" { "Are you sure you want to go through with the $time second Restart? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+            "a" {
+                "Are you sure you want to go through with the $time second Restart? 'Y' - Yes | 'N' - No"
+                $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
                     {$_ -in "y","e"} {
                         if ($messageMode) {
@@ -410,7 +415,9 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
                     {$_ -in "n","q"} { $choosing = $false }
                 }
             }
-            "b" { "Are you sure you want to go through with the $time second Shutdown? 'Y' - Yes | 'N' - No"; $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+            "b" {
+                "Are you sure you want to go through with the $time second Shutdown? 'Y' - Yes | 'N' - No"
+                $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
                     {$_ -in "y","e"} {
                         if ($messageMode) {
@@ -437,7 +444,8 @@ function Ping-Interface {
     $pingOption = $true
     while ($pingOption) {
         
-            # If $parameter is $null and $recentMode is $false, ask for an ip. If users leave it blank, it populates itself and ends the loop as well as the Ping mode (could be better)
+            # If $parameter is $null and $recentMode is $false, ask for an ip.
+            # If users leave it blank, it populates itself and ends the loop as well as the Ping mode (could be better)
         if (-not $parameter) { 
             if (-not $recentMode) { 
                 do {
@@ -465,7 +473,8 @@ function Ping-Interface {
             "e" { $global:clear = $true; return }
             "a" { $n = 1 }
             "b" { $constPing = $true }
-        } if (-not $constPing) { $pingResult = ping -n $n $pingIP } elseif ($constPing) { $constPing = $false; Start-Process cmd.exe -ArgumentList "/c ping -t $pingIP" }
+        } if (-not $constPing) { $pingResult = ping -n $n $pingIP }
+        elseif ($constPing) { $constPing = $false; Start-Process cmd.exe -ArgumentList "/c ping -t $pingIP" }
                 
         [System.Console]::Clear()
         ping -n 1 $pingIP
