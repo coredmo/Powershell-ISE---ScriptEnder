@@ -29,15 +29,15 @@ help | h: List this menu
 terminal |  term |  t: Start-Process cmd.exe or powershell.exe
 search   |  ad   |  a: Search your active directory's computer descriptions and save objects to a recents list
 recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
-wake     |  wol  |  w: Send a magic packet to a MAC Address, UDP via port 7 (Recent compatible)
-shutdown | shut  |  s: Restart a selected host using the shutdown command (Recent compatible)
-ping     |          p: Ping a selected host in 3 different modes (Recent compatible)
+wake     |  wol  |  w: Send a magic packet to a MAC Address or primary computer's MAC if available, UDP via port 7
+shutdown | shut  |  s: Restart a selected host or primary computer using the shutdown command
+ping     |          p: Ping a selected host or primary computer in 3 different modes
 exprs    |         rs: Restart and open Windows Explorer
-gpupdate |  gpu  | gp: Run a simple forced group policy update
+gpupdate |  gpu  | gp: Run a simple forced group policy update or display the RSoP summary data
 
 Often times Y = "e" and N = "q"
 
-- Connor's Scripted Toolkit (ISE Iteration 1)-
+- Connor's Scripted Toolkit (ISE Iteration 2 (Not an ISE))-
 https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 "@
 Write-Host "Press enter to return..."
@@ -250,7 +250,7 @@ function Terminal {
 }
 
 
-    # Run a simple group policy update
+    # Run a simple forced group policy update or display the RSoP summary data
 function Group-Policy {
     $gpMode = $true
     while ($gpMode) {
@@ -284,22 +284,27 @@ function Group-Policy {
         #region
     # Send a magic packet to a MAC Address, UDP via port 7
 function Invoke-WOL {
-    $wolMode = $true
-    while ($wolMode) {
+    while ($true) {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
-        elseif ($recentMode) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS"; $wolMode = $false; continue } }
+        elseif ($recentMode) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS"; break} }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
-        if ($mac -notmatch $macRegEx) { $wolMode = $false; Clear-Host; continue }
+        if (-not $mac) { Clear-Host; break } elseif ($mac -notmatch $macRegEx) { Clear-Host; "Invalid Input"; break }
         else {
-            $macByteArray = $mac -split "[:-]" | ForEach-Object { [Byte] "0x$_"}
-            [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray  * 16)
-            $udpClient = New-Object System.Net.Sockets.UdpClient
-            $udpClient.Connect(([System.Net.IPAddress]::Broadcast),7)
-            $udpResult = $udpClient.Send($MagicPacket,$MagicPacket.Length)
-            $udpClient.Close()
-            Write-Host "$udpResult | $mac --- $macByteArray"
-            Start-Sleep -Milliseconds 1000
-            if ($recentMode -or $parameterMode) { $wolMode = $false }
+            try {
+                $macByteArray = $mac -split "[:-]" | ForEach-Object { [Byte] "0x$_"}
+                [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray  * 16)
+                $udpClient = New-Object System.Net.Sockets.UdpClient
+                $udpClient.Connect(([System.Net.IPAddress]::Broadcast),7)
+                $udpResult = $udpClient.Send($MagicPacket,$MagicPacket.Length)
+                $udpClient.Close()
+                Write-Host "$udpResult | $mac --- $macByteArray"
+                Start-Sleep -Milliseconds 1000
+                if ($recentMode -or $parameterMode) { break }
+            } catch [System.Net.Sockets.SocketException] {
+                "SocketException occurred. Error Code: $($_.ErrorCode) - $($_.Message)"
+            } catch {
+                "An unexpected error occurred: $_"
+            }
         }
     }
 }
