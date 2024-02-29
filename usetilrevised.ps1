@@ -3,7 +3,6 @@
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
 
-$choosing = $true
 $recentMode = $false
 $validCmd = @('ping','p')
 
@@ -49,15 +48,13 @@ if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($no
         #region
     # Search the local active directory's computer descriptions
 function Scan-Create {
-    $adMode = $true
-    $adLoop = $true
     $pingConfig = $false
-    while ($adLoop) {
+    while ($true) {
 
         Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
         $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
-            # Get the domain controller IP
+            # Get the domain controller IP and cache it globally
         $global:dcIP = (Resolve-DnsName -Name (Get-ADDomainController).HostName | Select-Object -ExpandProperty IPAddress).ToString()
 
             # Select Ping Mode
@@ -67,36 +64,34 @@ function Scan-Create {
         }
         Clear-Host
     }
-    while ($adMode -eq $true) {
+    while ($true) {
             
             # adRecents is is enabled if you have previously saved a unitList (Recents list)
-        if ($adRecents -eq $true -and $recents.Count -gt 0) { 
+        if ($adRecents -and $recents.Count -gt 0) { 
             $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
         }
 
         Write-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -"
         $input = Read-Host "You can press 'c' while its querying to abort the process`n>"
         if (-not $input) {
-            [System.Console]::Clear();
-            $adMode = $false
-            $preBreak = $true; break
+            [System.Console]::Clear(); break
         }
 
-        [System.Console]::Clear();
-        if ($preBreak -eq $true) { continue }
+        [System.Console]::Clear()
     
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "Showing results for $input`n"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
         
-        # Grabs the Active Directory object description
+            # Grabs the Active Directory object description
         $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description
         $dcTarget = $false
         
-        # Initialize a recents list
+            # Initialize a recents list
         $global:unitList = @()
 
-        # If there are results, iterate through each computer object, adding them to the unitList and grabbing information AS WELL AS pinging. Pressing C at any point will break the for loop.
+            # If there are results, iterate through each computer object, adding them to the unitList and grabbing information AS WELL AS pinging
+            # Pressing C at any point will break the loop.
         if ($result) {
             foreach ($computer in $result) {
                 $cancelResult = $false
@@ -107,18 +102,23 @@ function Scan-Create {
                 }
                 if ($cancelResult) { break }
                 
-                # Use nslookup to grab the computer's IP
+                    # Use nslookup to grab the computer's IP
                 Write-Host "$($computer.Name), $($computer.Description)"
                 $nsResult = nslookup $($computer.Name)
                 $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
                 $resultV4 = [regex]::Matches($nsResult, $nsRegex)
                 $global:unitList += $resultV4[0].Value + "-" + $computer.Name
 
+                    # If host pinging is enabled and the available $resultV4 isn't the domain controller
+                    # (I could just use the computer name) ping the IPv4 and color the output
                 if ($pingConfig -eq $true) { 
                     if ($global:dcIP -notcontains $resultV4) {
                         $pingResult = ping -n 1 $resultV4
                         if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-                        else { $host.UI.RawUI.ForegroundColor = "Green"; "The host '$resultV4' was pinged successfully"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                        else {
+                            $host.UI.RawUI.ForegroundColor = "Green"
+                            "The host '$resultV4' was pinged successfully"
+                            $host.UI.RawUI.ForegroundColor = $orig_fg_color }
                     } else { 
                         $host.UI.RawUI.ForegroundColor = "Red"
                         "Ping skipped: Target is the domain controller"
@@ -126,27 +126,34 @@ function Scan-Create {
                         $dcTarget = $true
                     }
                 }
+
+                    # Try to find the $resultV4 in the arp table and acquire its associated MAC address.
+                    # If it isn't found but the host can still be pinged, assume it's in a different LAN
                 $macResult = arp -a | findstr "$resultV4"
                 if ($macResult -eq $null -or $macResult -eq '') {
                     if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
                     if ($diffLan -eq $true) {
-                    $host.UI.RawUI.ForegroundColor = "Yellow"
-                    if ($dcTarget -eq $false) { Write-Host "  This host may be in a different LAN" }
-                    $dcTarget = $false
-                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                    $diffLan = $false
-                    }
-                }
-                $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                "----------------------------"
+                        $host.UI.RawUI.ForegroundColor = "Yellow"
+                        if ($dcTarget -eq $false) { Write-Host "  This host may be in a different LAN" }
+                            $dcTarget = $false
+                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                            $diffLan = $false
+                        }
+                } else { $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                    "----------------------------"
             }
         } else {
             Write-Host "No results found for $input`n"
         }
+            # Press C to exit Scan-Create, press S to save the newly made $unitList as $recents, any other key just resets the search
+            # (if $unitList is empty, make $recents = $null)
         Write-Host "`nPress any key to reset or press S to save this list to the recents list`nPress c to return to the command line..."
         $adOption = [System.Console]::ReadKey().Key; [System.Console]::Clear();
-        if ($adOption -ieq "c") { $adMode = $false }
-        elseif ($adOption -ieq "s") { if (-not $unitList) { Write-Host "The recents list is empty" } else { $recents = $unitList; $adRecents = $true }}
+        if ($adOption -ieq "c") { break }
+        elseif ($adOption -ieq "s") {
+            if (-not $unitList) { $recents = $null; $adRecents = $false; Write-Host "The recents list is empty/has been cleared" }
+                else { $recents = $unitList; $adRecents = $true }
+        }
     }
 }
 
@@ -172,7 +179,8 @@ function Invoke-Recents {
                 $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color 
             }
             
-            if (-not $macResult) { " " + $unitIP + "`n" }; if ($dcIP -contains $unitIP) { "Domain Controller`n" }; if (-not $result) { $unitName } else { $result.Name; $result.Description }
+            if (-not $macResult) { " " + $unitIP + "`n" }; if ($dcIP -contains $unitIP) { "Domain Controller`n" }
+            if (-not $result) { $unitName } else { $result.Name; $result.Description }
             "`n------------`n"
         }
 
@@ -194,7 +202,8 @@ function Invoke-Recents {
 
             $tempSelect = $true
             Do {
-                    # Display the name of the ad object and its description then display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
+                    # Display the name of the ad object and its description then display the mac if it exists.
+                    # Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
                 "`n"; $result.Name; $result.Description
                 if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
                 else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
@@ -474,7 +483,7 @@ function Ping-Interface {
 }
         #endregion
 
-while ($choosing) {
+while ($true) {
     $correct = $false
     $parameter = $null
 
