@@ -3,9 +3,6 @@
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
 
-$recentMode = $false
-$validCmd = @('ping','p')
-
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
 $username = $parts[-1] # Gets the current users name and strips its domain name
@@ -113,7 +110,7 @@ function Scan-Create {
 
                     # If host pinging is enabled and the available $resultV4 isn't the domain controller
                     # (I could just use the computer name) ping the IPv4 and color the output
-                if ($pingConfig -eq $true) { 
+                if ($pingConfig) { 
                     if ($global:dcIP -notcontains $resultV4) {
                         $pingResult = ping -n 1 $resultV4
                         if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
@@ -134,7 +131,7 @@ function Scan-Create {
                 $macResult = arp -a | findstr "$resultV4"
                 if ($macResult -eq $null -or $macResult -eq '') {
                     if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
-                    if ($diffLan -eq $true) {
+                    if ($diffLan) {
                         $host.UI.RawUI.ForegroundColor = "Yellow"
                         if ($dcTarget -eq $false) { Write-Host "  This host may be in a different LAN" }
                             $dcTarget = $false
@@ -501,7 +498,7 @@ while ($true) {
 
     # Read a command from a user and split it if they add extra parameters
     Write-Host "`nType a command or 'help' for a list of commands"
-    if ($recentMode -eq $true) { 
+    if ($recentMode) { 
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host " - Selected Host: $selectedName - Enter 'e' to disable"; " - " + $selectedResult.Description 
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -539,11 +536,11 @@ while ($true) {
 
         {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
 
-        {$_ -in "e", "d"} { C; if ($recentMode -eq $true) { $recentMode = $false; "Disabled Recent Mode" } }
+        {$_ -in "e", "d"} { C; if ($recentMode) { $recentMode = $false; "Disabled Recent Mode" } }
 
     }
 
-    if ($correct -eq $true) {
+    if ($correct) {
         if ($clear) { $clear = $false; Clear-Host }
         continue
     } else {
