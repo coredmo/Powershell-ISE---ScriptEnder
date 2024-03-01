@@ -199,25 +199,18 @@ function Invoke-Recents {
             Clear-Host
             $result = Get-ADComputer -Identity "$selectedName" -Properties Description | Select-Object Name,Description
 
-            Do {
-                    # Display the name of the ad object and its description then display the mac if it exists.
-                    # Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
-                "`n"; $result.Name; $result.Description
-                if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
-                else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-                if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
-                
-                Write-Host "Do you want to select this host as the primary unit? Y - N"
-                $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-                switch ($adInput) {
-                        # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
-                    {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
-                                        $global:selectedName = $selectedName; $global:selectedResult = $result; $exit = $true }
-                    {$_ -in "n", "q"} { $exit = $true }
-                }
-                Clear-Host
-                if ($exit) { break }
-            } while ($true)
+                # Display the name of the ad object and its description then display the mac if it exists.
+                # Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
+            "`n"; $result.Name; $result.Description
+            if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
+            else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+            if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
+            
+                # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
+            $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
+            $global:selectedName = $selectedName; $global:selectedResult = $result
+
+            Clear-Host
         }
     }
 }
