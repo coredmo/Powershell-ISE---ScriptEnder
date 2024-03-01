@@ -65,6 +65,7 @@ function Scan-Create {
         if ($adLoop -eq $false) { break }
         Clear-Host
     }
+
     while ($true) {
             
             # adRecents is is enabled if you have previously saved a unitList (Recents list)
@@ -505,6 +506,7 @@ while ($true) {
         Write-Host " - Selected Host: $selectedName - Enter 'e' to disable"; " - " + $selectedResult.Description 
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
     }
+
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
     if ($choice -ieq "a command") { C; ":D"; continue }
