@@ -62,6 +62,7 @@ function Scan-Create {
             {$_ -in "y", "e"} { $pingConfig = $true; $adLoop = $false; [System.Console]::Clear(); "Pinging each selected host" }
             {$_ -in "n", "q"} { $pingConfig = $false; $adLoop = $false; [System.Console]::Clear(); "Skipping ping function" }
         }
+        if ($adLoop -eq $false) { break }
         Clear-Host
     }
     while ($true) {
