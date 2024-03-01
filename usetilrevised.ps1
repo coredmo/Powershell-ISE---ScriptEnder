@@ -214,10 +214,11 @@ function Invoke-Recents {
                 switch ($adInput) {
                         # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
                     {$_ -in "y", "e"} { $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
-                                        $global:selectedName = $selectedName; $global:selectedResult = $result; break }
-                    {$_ -in "n", "q"} { break }
+                                        $global:selectedName = $selectedName; $global:selectedResult = $result; $exit = $true }
+                    {$_ -in "n", "q"} { $exit = $true }
                 }
                 Clear-Host
+                if ($exit) { break }
             } while ($true)
         }
     }
