@@ -74,10 +74,9 @@ function Scan-Create {
         $input = Read-Host "You can press 'c' while its querying to abort the process`n>"
         if (-not $input) {
             [System.Console]::Clear(); break
-        }
-
-        [System.Console]::Clear()
-    
+        } else { [System.Console]::Clear() }
+        $input = $input -replace "'", ""
+   
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "Showing results for $input`n"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -89,8 +88,8 @@ function Scan-Create {
             # Initialize a recents list
         $global:unitList = @()
 
-            # If there are results, iterate through each computer object, adding them to the unitList and grabbing information AS WELL AS pinging
-            # Pressing C at any point will break the loop.
+            # If there are results, iterate through each computer object, adding them to the unitList and grabbing information
+            # Pressing C while its iterating will break the loop.
         if ($result) {
             foreach ($computer in $result) {
                 $cancelResult = $false
@@ -98,26 +97,28 @@ function Scan-Create {
                     Write-Host " button pressed:`nAborting query..."
                     Start-Sleep -Milliseconds 60
                     $cancelResult = $true
-                }
-                if ($cancelResult) { break }
+                } if ($cancelResult) { break }
                 
-                    # Use nslookup to grab the computer's IP
+                    # Use nslookup to grab the computer's IP (I should use try/catch for these)
                 Write-Host "$($computer.Name), $($computer.Description)"
                 $nsResult = nslookup $($computer.Name)
                 $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
                 $resultV4 = [regex]::Matches($nsResult, $nsRegex)
                 $global:unitList += $resultV4[0].Value + "-" + $computer.Name
 
-                    # If host pinging is enabled and the available $resultV4 isn't the domain controller
-                    # (I could just use the computer name) ping the IPv4 and color the output
+                    # If host pinging is enabled and the available $resultV4 isn't the domain controller, ping the IPv4 and color the output
                 if ($pingConfig) { 
                     if ($global:dcIP -notcontains $resultV4) {
-                        $pingResult = ping -n 1 $resultV4
-                        if (-not $?) { $host.UI.RawUI.ForegroundColor = "Red"; "$pingResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-                        else {
+                        try {
+                            $pingResult = Test-Connection -ComputerName $resultV4[0].Value -Count 1 -ErrorAction Stop
                             $host.UI.RawUI.ForegroundColor = "Green"
-                            "The host '$resultV4' was pinged successfully"
-                            $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                            "The host '$($resultV4[0].Value)' was pinged successfully"
+                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                        } catch {
+                            $host.UI.RawUI.ForegroundColor = "Red"
+                            "Failed to ping the host '$($resultV4[0].Value)'"
+                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                        }
                     } else { 
                         $host.UI.RawUI.ForegroundColor = "Red"
                         "Ping skipped: Target is the domain controller"
@@ -133,7 +134,7 @@ function Scan-Create {
                     if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
                     if ($diffLan) {
                         $host.UI.RawUI.ForegroundColor = "Yellow"
-                        if ($dcTarget -eq $false) { Write-Host "  This host may be in a different LAN" }
+                        if ($dcTarget -eq $false) { Write-Host "  Unable to find the host's physical address" }
                             $dcTarget = $false
                             $host.UI.RawUI.ForegroundColor = $orig_fg_color
                             $diffLan = $false
