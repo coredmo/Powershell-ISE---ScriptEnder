@@ -1,4 +1,4 @@
-﻿# A convenient bundle of scripted utilities - Created and managed by Connor :)
+﻿# A convenient bundle of scripted utilities - Created by Connor (:
 
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
@@ -23,13 +23,15 @@ The Help Menu:
 help | h: List this menu
 
 terminal |  term |  t: Start-Process cmd.exe or powershell.exe
-search   |  ad   |  a: Search your active directory's computer descriptions and save objects to a recents list
-recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
 wake     |  wol  |  w: Send a magic packet to a MAC Address or primary computer's MAC if available, UDP via port 7
 shutdown | shut  |  s: Restart a selected host or primary computer using the shutdown command
 ping     |          p: Ping a selected host or primary computer in 3 different modes
 exprs    |         rs: Restart and open Windows Explorer
 gpupdate |  gpu  | gp: Run a simple forced group policy update or display the RSoP summary data
+
+Requires RSAT Active Directory Module:
+search   |  ad   |  a: Search your active directory's computer descriptions and save objects to a recents list
+recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
 
 Often times Y = "e" and N = "q"
 
@@ -47,6 +49,15 @@ if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($no
 function Scan-Create {
     $pingConfig = $false
     while ($true) {
+            # Grabs the Active Directory object description and continues if RSAT Active Directory Tools are installed
+        try {
+            $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description -ErrorAction Stop; $dcTarget = $false
+        } catch {
+            $host.UI.RawUI.ForegroundColor = "Red"
+            Write-Host "Active Directory Tools are not installed..."
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            $error = $true; break
+        }  
 
         Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
         $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
@@ -63,8 +74,10 @@ function Scan-Create {
         Clear-Host
     }
 
-    while ($true) {
-            
+    if ($error) { Return }
+
+    while ($true) {     
+
             # adRecents is is enabled if you have previously saved a unitList (Recents list)
         if ($adRecents -and $recents.Count -gt 0) { 
             $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -80,10 +93,6 @@ function Scan-Create {
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "Showing results for $input`n"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
-        
-            # Grabs the Active Directory object description
-        $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description
-        $dcTarget = $false
         
             # Initialize a recents list
         $global:unitList = @()
