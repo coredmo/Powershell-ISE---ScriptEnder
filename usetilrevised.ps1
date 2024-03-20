@@ -30,8 +30,9 @@ exprs    |         rs: Restart and open Windows Explorer
 gpupdate |  gpu  | gp: Run a simple forced group policy update or display the RSoP summary data
 
 Requires RSAT Active Directory Module:
-search   |  ad   |  a: Search your active directory's computer descriptions and save objects to a recents list
+search   |   ad  |  a: Search your active directory's computer descriptions and save objects to a recents list
 recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
+file     | stat  |  f: Session checker and quick network file explorer for a primay or inputted host
 
 Often times Y = "e" and N = "q"
 
@@ -262,7 +263,6 @@ function Terminal {
     Clear-Host
 }
 
-
     # Run a simple forced group policy update or display the RSoP summary data
 function Group-Policy {
     while ($true) {
@@ -321,6 +321,72 @@ function Invoke-WOL {
     }
 }
 
+
+    # Session checker and quick network file explorer
+function Invoke-Explorer {
+    if (-not $parameter) { 
+        if (-not $recentMode) {
+            $option = $true
+            do {
+                Clear-Host; $mainIP = Read-Host "- Status and File Explorer - Enter an IP or leave it blank to return to command-line -`n>"
+                if (-not $mainIP) { $option = $false }
+            } while (-not $mainIP -and $option) } else { $mainIP = $selectedName }
+        } else { $mainIP = $parameter }
+    if ($option -eq $false) { Clear-Host; continue } Clear-Host
+
+    Write-Host "Testing connection..."
+    try { Test-Connection $mainIP -Count 1 -ErrorAction Stop } catch { Clear-Host
+        $host.UI.RawUI.ForegroundColor = "Red"
+        Write-Host "Unable to contact the selected host"
+        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        continue
+    } Clear-Host
+
+    $ipv4Result = nslookup $mainIP
+    $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
+    if ($nsResultV4.Count -lt 2) { "" } else { $resultV4 = $nsResultV4[1]; $mac = arp -a | findstr "$resultV4" }
+
+    $result = Get-ADComputer -Identity "$mainIP" -Properties Description | Select-Object Name,Description
+    
+        # Display the name of the ad object and its description then display the mac if it exists.
+        # Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
+    "`n"; $result.Name; $result.Description
+    if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
+    else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+    if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
+
+        # Loop an error message until $choice becomes one of the $eValues
+    Clear-Host
+    do {
+        if ($qMode) { query session /server:"$mainIP" }
+        $choice = $null
+        $eValues = @('s','e')
+@"
+`nSelected '$mainIP'`n`nWhat action do you take?`nS - Make the host become the 'Selected Host'
+F - Open the host in file explorer`nQ - Query sessions on the host`nE - Exit 
+"@
+        $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+
+            # Loop an error message until t, c, or e is pressed. Then loop errors when $input isn't a valid number or when $message isn't less than 512 characters
+        if ($choice -ieq "f") {
+            ii \\$mainIP\c$
+        } elseif ($choice -ieq "q") {
+            if ($qMode) { $qMode = $false } else { $qMode = $true }
+        }        
+
+        if (-not $choice) {
+            [System.Console]::Clear();
+            $host.UI.RawUI.ForegroundColor = "Red"
+            Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        } Clear-Host
+    } while ($eValues -notcontains $choice)
+    if ($choice -ieq "s") {
+        # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
+    $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $resultV4
+    $global:selectedName = $result.Name; $global:selectedResult = $result
+    }
+}
 
     # Send a shutdown or restart command to a selected user's computer (could be better)
 function Invoke-Shutdown {
@@ -538,6 +604,8 @@ while ($true) {
         {$_ -in "shutdown","shut","s","c"} { C; Invoke-Shutdown }
 
         {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
+
+        {$_ -in "file","stat","f"} { C; Invoke-Explorer }
 
         {$_ -in "e", "d"} { C; if ($recentMode) { $recentMode = $false; "Disabled Recent Mode" } }
 
