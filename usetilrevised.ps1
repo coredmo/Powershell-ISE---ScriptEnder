@@ -50,15 +50,22 @@ if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($no
 function Scan-Create {
     $pingConfig = $false
     while ($true) {
-            # Grabs the Active Directory object description and continues if RSAT Active Directory Tools are installed
-        try {
-            $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description -ErrorAction Stop; $dcTarget = $false
-        } catch {
-            $host.UI.RawUI.ForegroundColor = "Red"
-            Write-Host "Active Directory Tools are not installed..."
-            $host.UI.RawUI.ForegroundColor = $orig_fg_color
-            $error = $true; break
-        }  
+            # If RSAT Active Directory Tools are 'NotPresent' try installing and importing them, catching and ending if it fails
+            # It will just Import-Module if it is installed, skipping this check next time
+        if (-not $skipNext) {
+            $capability = Get-Module -ListAvailable | Where-Object {$_.Name -eq 'ActiveDirectory'}
+            if ($capability.Name -notcontains "ActiveDirectory") {
+                try {
+                    $rsatError = $false
+                    Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+                    Import-Module ActiveDirectory; $global:skipNext = $true
+                } catch { 
+                    $host.UI.RawUI.ForegroundColor = "Red"
+                    Write-Host "Active Directory Tools are not installed..."
+                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    $error = $true; $errorInfo = $_.Exception; break }
+            } else { Import-Module ActiveDirectory; $global:skipNext = $true }
+        }
 
         Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
         $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
@@ -90,6 +97,7 @@ function Scan-Create {
             [System.Console]::Clear(); break
         } else { [System.Console]::Clear() }
         $input = $input -replace "'", ""
+        $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description
    
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "Showing results for $input`n"
@@ -321,7 +329,6 @@ function Invoke-WOL {
     }
 }
 
-
     # Session checker and quick network file explorer
 function Invoke-Explorer {
     if (-not $parameter) { 
@@ -506,7 +513,6 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
         }
     }
 }
-
 
     # Ping a selected host in different modes
 function Ping-Interface {
