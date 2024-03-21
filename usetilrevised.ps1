@@ -23,8 +23,8 @@ Write-Host @"
 
 The Help Menu:
 
-help   | h: List this menu
-config | c: Create or edit a config list
+help     | h: List this menu
+config   | c: Create or edit a config list
 
 terminal |  term |  t: Start-Process cmd.exe or powershell.exe
 wake     |  wol  |  w: Send a magic packet to a MAC Address or primary computer's MAC if available, UDP via port 7
