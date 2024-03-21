@@ -8,6 +8,9 @@ $parts = $currentUser -split '\\'
 $username = $parts[-1] # Gets the current users name and strips its domain name
 
 $folderPath = "C:\users\$username"
+$tempFile = "C:\Temp"
+$configFile = $tempFile + "\usetilconfig.txt"
+#$workingDir = Get-Location; $workPath = $workingDir.Path
 
 $orig_fg_color = $host.UI.RawUI.ForegroundColor
 
@@ -44,27 +47,106 @@ $noid = Read-Host -Debug; Clear-Host
 if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($noid -ieq " ") { Write-Host "dingus" }
 }
 
+    # Config reading and functionality
+        #region
+    # Function to read the config file and convert it to a hashtable
+function Read-Config {
+    $configHash = @{}
+    Get-Content $configFile | ForEach-Object {
+        $parts = $_ -split ': '
+        if ($parts.Count -eq 2) {
+            $configHash[$parts[0].Trim()] = $parts[1].Trim()
+        }
+    }
+    return $configHash
+}
+
+    # Function to toggle a specific setting
+function Toggle-Setting {
+    param (
+        [string]$settingName
+    )
+    $config = Read-Config
+    if ($config.ContainsKey($settingName)) {
+        $currentValue = $config[$settingName]
+        $newValue = if ($currentValue -eq "True") { "False" } else { "True" }
+        $config[$settingName] = $newValue
+
+        # Prepare the updated config content
+        $updatedConfigContent = $config.GetEnumerator() | ForEach-Object {
+            "$($_.Key): $($_.Value)"
+        }
+
+        # Write the updated config back to the file
+        $updatedConfigContent | Out-File -FilePath $configFile -Force
+    } else {
+        "Setting '$settingName' not found."
+    }
+}
+
+    # Function to check the status of a specific setting
+function Check-Status {
+    param (
+        [string]$settingName
+    )
+    $config = Read-Config
+    if ($config.ContainsKey($settingName)) {
+        "$($config[$settingName])"
+    } else {
+        "Setting '$settingName' not found."
+    }
+}
+
+    # Config file creator and manager (for special actions)
+function Invoke-Config {
+    if (-not (Test-Path $configFile)) {
+        try {
+            Write-Host "Config.txt is being created in $tempFile"
+            $tempStatus = New-Item -Path "$tempFile" -ItemType Directory -Force -ErrorAction SilentlyContinue
+            New-Item -Path "$configFile" -ItemType File -ErrorAction Stop
+            "Debug: True`nAD-Capability Check: True" | Out-File -FilePath $configFile -Append
+            $successful = $true
+        } catch {
+            $tempStatus,"`n"; $_.Exception; "`nDepending on the error, you may need to create the 'C:\Temp' folder"
+        }
+        if ($successful) { Write-Host "File successfully created.`n`n Enter C again to edit the file" }
+    } else {
+        do {
+            $configInfo = Get-Content -Path $configFile; $configInfo
+            Write-Host "`nA - Toggle Debug | S - Toggle AD RSAT checker | E - Exit"
+            $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+            if ($choice -ieq "a") { Toggle-Setting -settingName "Debug" }
+            elseif ($choice -ieq "s") { Toggle-Setting -settingName "AD-Capability Check" }
+            Clear-Host
+        } while ($choice -notcontains 'e')
+    }
+}
+        #endregion
+
     # Recents and AD functionality
         #region
     # Search the local active directory's computer descriptions
 function Scan-Create {
-    $pingConfig = $false
     while ($true) {
-            # If RSAT Active Directory Tools are 'NotPresent' try installing and importing them, catching and ending if it fails
-            # It will just Import-Module if it is installed, skipping this check next time
+            # If RSAT Active Directory Tools are not installed, try installing and importing them, catching and ending if it fails
+            # It will Import-Module if it is or has been installed, skipping this check next time
+        if (-not (Test-Path $configFile)) { $adCheck = $true } else { $checkStat = $true }
+        if ($checkStat) { if ((Check-Status -settingName "AD-Capability Check") -contains "True") { $adCheck = $true }}
         if (-not $skipNext) {
-            $capability = Get-Module -ListAvailable | Where-Object {$_.Name -eq 'ActiveDirectory'}
-            if ($capability.Name -notcontains "ActiveDirectory") {
-                try {
-                    $rsatError = $false
-                    Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
-                    Import-Module ActiveDirectory; $global:skipNext = $true
-                } catch { 
-                    $host.UI.RawUI.ForegroundColor = "Red"
-                    Write-Host "Active Directory Tools are not installed..."
-                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                    $error = $true; $errorInfo = $_.Exception; break }
-            } else { Import-Module ActiveDirectory; $global:skipNext = $true }
+            if ($adCheck) {
+                $capability = Get-Module -ListAvailable | Where-Object {$_.Name -eq 'ActiveDirectory'}
+                if ($capability.Name -notcontains "ActiveDirectory") {
+                    try {
+                        $rsatError = $false
+                        Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+                        Import-Module ActiveDirectory; $global:skipNext = $true
+                    } catch { 
+                        $host.UI.RawUI.ForegroundColor = "Red"
+                        Write-Host "Active Directory Tools are not installed..."
+                        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                        $error = $true; $errorInfo = $_.Exception; break }
+                } else { Import-Module ActiveDirectory; $global:skipNext = $true }
+            }
         }
 
         Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
@@ -82,10 +164,9 @@ function Scan-Create {
         Clear-Host
     }
 
-    if ($error) { Return }
+    if ($error -eq $true) { Return }
 
-    while ($true) {     
-
+    while ($true) {
             # adRecents is is enabled if you have previously saved a unitList (Recents list)
         if ($adRecents -and $recents.Count -gt 0) { 
             $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -148,15 +229,17 @@ function Scan-Create {
                     # Try to find the $resultV4 in the arp table and acquire its associated MAC address.
                     # If it isn't found but the host can still be pinged, assume it's in a different LAN
                 $macResult = arp -a | findstr "$resultV4"
-                if ($macResult -eq $null -or $macResult -eq '') {
-                    if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") { $diffLan = $false } else { $diffLan = $true }
+                if ([string]::IsNullOrEmpty($macResult)) {
+                    if ($pingResult -like "*Request timed out.*" -or $pingResult -like "*could not find host*") {
+                        $diffLan = $false } else { $diffLan = $true }
                     if ($diffLan) {
                         $host.UI.RawUI.ForegroundColor = "Yellow"
                         if ($dcTarget -eq $false) { Write-Host "  Unable to find the host's physical address" }
+                        else { Write-Host "  Host address invalid" }
                             $dcTarget = $false
-                            $host.UI.RawUI.ForegroundColor = $orig_fg_color
                             $diffLan = $false
-                        }
+                    }
+                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
                 } else { $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
                     "----------------------------"
             }
@@ -607,13 +690,15 @@ while ($true) {
 
         {$_ -in "terminal","term","t"} { C; Terminal }
 
-        {$_ -in "shutdown","shut","s","c"} { C; Invoke-Shutdown }
+        {$_ -in "shutdown","shut","s"} { C; Invoke-Shutdown }
 
         {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
 
         {$_ -in "file","stat","f"} { C; Invoke-Explorer }
 
         {$_ -in "e", "d"} { C; if ($recentMode) { $recentMode = $false; "Disabled Recent Mode" } }
+
+        {$_ -in "config","c"} { C; Invoke-Config }
 
     }
 
