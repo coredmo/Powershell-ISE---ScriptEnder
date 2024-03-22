@@ -73,12 +73,12 @@ function Toggle-Setting {
         $newValue = if ($currentValue -eq "True") { "False" } else { "True" }
         $config[$settingName] = $newValue
 
-        # Prepare the updated config content
+            # Prepare the updated config content
         $updatedConfigContent = $config.GetEnumerator() | ForEach-Object {
             "$($_.Key): $($_.Value)"
         }
 
-        # Write the updated config back to the file
+            # Write the updated config back to the file
         $updatedConfigContent | Out-File -FilePath $configFile -Force
     } else {
         "Setting '$settingName' not found."
@@ -129,6 +129,7 @@ function Invoke-Config {
     # Search the local active directory's computer descriptions
 function Scan-Create {
     while ($true) {
+            # If $configFile exists, $adCheck will be determined by the status of AD-Capability Check. Otherwise default to $adCheck = $true
             # If RSAT Active Directory Tools are not installed, try installing and importing them, catching and ending if it fails
             # It will Import-Module if it is or has been installed, skipping this check next time
         if (-not (Test-Path $configFile)) { $adCheck = $true } else { $checkStat = $true }
@@ -241,7 +242,7 @@ function Scan-Create {
                             $diffLan = $false
                     }
                     $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                } else { $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+                } else { $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult"; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
                     "----------------------------"
             }
         } else {
