@@ -398,7 +398,7 @@ function Group-Policy {
 
     # Parameter included Utilities
         #region
-    # Use nslookup and arp and cache the computer's IP and MAC 
+    # Use nslookup and arp, then cache the computer's IP and MAC 
 function Get-IP {
     param (
         [string]$mainIP
@@ -482,7 +482,6 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nE - Exit
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
-            # Loop an error message until t, c, or e is pressed. Then loop errors when $input isn't a valid number or when $message isn't less than 512 characters
         if ($choice -ieq "f") {
             ii \\$mainIP\c$
         } elseif ($choice -ieq "q") {
@@ -503,7 +502,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nE - Exit
     }
 }
 
-    # Restart and open Windows Explorer
+    # Restart and open Windows Explorer. Uses WMIC to run it on another host
 function Explorer-RS {
     if ($parameter) { wmic /node:"$parameter" process call create "powershell.exe Stop-Process -Name explorer -Force; Start-Process explorer" }
     else { Stop-Process -Name explorer -Force; Start-Process explorer }
