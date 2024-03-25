@@ -23,20 +23,20 @@ Write-Host @"
 
 The Help Menu:
 
-help     | h: List this menu
-config   | c: Create or edit a config list
+help     |    h: List this menu
+config   |    c: Create or edit a config list | C:\Temp\usetilconfig.txt
 
 terminal |  term |  t: Start-Process cmd.exe or powershell.exe
 wake     |  wol  |  w: Send a magic packet to a MAC Address or primary computer's MAC if available, UDP via port 7
 shutdown | shut  |  s: Restart a selected host or primary computer using the shutdown command
 ping     |          p: Ping a selected host or primary computer in 3 different modes
-exprs    |         rs: Restart and open Windows Explorer
+exprs    |         rs: Restart and open Windows Explorer: exprs (on local device) | exprs <IPv4> (on network host)
 gpupdate |  gpu  | gp: Run a simple forced group policy update or display the RSoP summary data
 
 Requires RSAT Active Directory Module:
 search   |   ad  |  a: Search your active directory's computer descriptions and save objects to a recents list
 recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
-file     | stat  |  f: Session checker and quick network file explorer for a primay or inputted host
+file     | stat  |  f: Session checker and quick network file explorer for a primary or inputted host
 
 Often times Y = "e" and N = "q"
 
@@ -48,7 +48,7 @@ $noid = Read-Host -Debug; Clear-Host
 if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($noid -ieq " ") { Write-Host "dingus" }
 }
 
-    # Config reading and functionality
+    # Config reading & functionality
         #region
     # Function to read the config file and convert it to a hashtable
 function Read-Config {
@@ -113,7 +113,7 @@ function Invoke-Config {
         if ($successful) { Write-Host "File successfully created.`n`n Enter C again to edit the file" }
     } else {
         do {
-            $configInfo = Get-Content -Path $configFile; $configInfo
+            Get-Content -Path $configFile
             Write-Host "`nA - Toggle Debug | S - Toggle AD RSAT checker | E - Exit"
             $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
             if ($choice -ieq "a") { Toggle-Setting -settingName "Debug" }
@@ -124,7 +124,7 @@ function Invoke-Config {
 }
         #endregion
 
-    # Recents and AD functionality
+    # Recents & AD functionality
         #region
     # Search the local active directory's computer descriptions
 function Scan-Create {
@@ -132,6 +132,7 @@ function Scan-Create {
             # If $configFile exists, $adCheck will be determined by the status of AD-Capability Check. Otherwise default to $adCheck = $true
             # If RSAT Active Directory Tools are not installed, try installing and importing them, catching and ending if it fails
             # It will Import-Module if it is or has been installed, skipping this check next time
+        $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Checking RSAT AD Tools status..."; $host.UI.RawUI.ForegroundColor = $orig_fg_color
         if (-not (Test-Path $configFile)) { $adCheck = $true } else { $checkStat = $true }
         if ($checkStat) { if ((Check-Status -settingName "AD-Capability Check") -contains "True") { $adCheck = $true }}
         if (-not $skipNext) {
@@ -149,15 +150,16 @@ function Scan-Create {
                         $error = $true; $errorInfo = $_.Exception; break }
                 } else { Import-Module ActiveDirectory; $global:skipNext = $true }
             }
-        }
+        } Clear-Host
 
             # Get the domain controller IP and cache it globally
         $global:dcIP = (Resolve-DnsName -Name (Get-ADDomainController).HostName | Select-Object -ExpandProperty IPAddress).ToString()
 
             # Select Ping Mode
         if ($parameter) {
+            Write-Host "You can press 'c' while its querying to abort the process"
             $host.UI.RawUI.ForegroundColor = "Yellow"
-            Write-Host "Selected host is: $parameter"
+            Write-Host "Selected host is: $parameter`n"
             $host.UI.RawUI.ForegroundColor = $orig_fg_color
         }
         Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
@@ -173,13 +175,15 @@ function Scan-Create {
     if ($error -eq $true) { Return }
 
     while ($true) {
-            # adRecents is is enabled if you have previously saved a unitList (Recents list)
+            # adRecents is enabled if you have previously saved a unitList (Recents list)
         if ($adRecents -and $recents.Count -gt 0) { 
             $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
         }
-
-        "You can press 'c' while its querying to abort the process`n"
-        if (-not $parameter) { $input = Read-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -`n>" }
+        
+        if (-not $parameter) { 
+            Write-Host "You can press 'c' while its querying to abort the process`n"
+            $input = Read-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -`n>"
+        }
         else { $input = $parameter }
         if (-not $input) {
             [System.Console]::Clear(); break
@@ -205,7 +209,7 @@ function Scan-Create {
                     $cancelResult = $true
                 } if ($cancelResult) { break }
                 
-                    # Use nslookup to grab the computer's IP (I should use try/catch for these)
+                    # Use nslookup to grab the computer's IP (I should update this to a function)
                 Write-Host "$($computer.Name), $($computer.Description)"
                 $nsResult = nslookup $($computer.Name)
                 $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
@@ -266,6 +270,7 @@ function Scan-Create {
     }
 }
 
+    # Open a recents list and select a host to be the primary computer
 function Invoke-Recents {
     if (-not $unitList) { Write-Host "The recents list is empty" }
     else {
@@ -326,7 +331,7 @@ function Invoke-Recents {
 }
         #endregion
 
-    # Utilities
+    # Tools & Utilities
         #region
     # Start-Process cmd.exe or powershell.exe
 function Terminal {
@@ -393,11 +398,26 @@ function Group-Policy {
 
     # Parameter included Utilities
         #region
+    # Use nslookup and arp and cache the computer's IP and MAC 
+function Get-IP {
+    param (
+        [string]$mainIP
+    )
+    $global:getV4 = $null
+    $global:getMAC = $null
+    
+    $ipv4Result = nslookup $mainIP
+    $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
+    if ($nsResultV4.Count -lt 2) { "" } else { $global:getV4 = $nsResultV4[1]; $arpResult = arp -a | findstr "$getV4" }
+    if ($arpResult -match $macRegEx) { $global:getMAC = $matches[0] }
+}
+
     # Send a magic packet to a MAC Address, UDP via port 7
 function Invoke-WOL {
     while ($true) {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
-        elseif ($recentMode) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS"; break} }
+        elseif ($parameter) { Get-IP $parameter; if ($getMAC -match $macRegEX) { $mac = $getMAC; $parameterMode = $true } else { "NO MAC ADDRESS"; break } }
+        elseif ($recentMode) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS"; break } }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
         if (-not $mac) { Clear-Host; break } elseif ($mac -notmatch $macRegEx) { Clear-Host; "Invalid Input"; break }
         else {
@@ -440,18 +460,15 @@ function Invoke-Explorer {
         continue
     } Clear-Host
 
-    $ipv4Result = nslookup $mainIP
-    $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
-    if ($nsResultV4.Count -lt 2) { "" } else { $resultV4 = $nsResultV4[1]; $mac = arp -a | findstr "$resultV4" }
-
+    Get-IP $mainIP
     $result = Get-ADComputer -Identity "$mainIP" -Properties Description | Select-Object Name,Description
     
         # Display the name of the ad object and its description then display the mac if it exists.
         # Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
     "`n"; $result.Name; $result.Description
-    if ($mac) { $host.UI.RawUI.ForegroundColor = "Yellow"; $mac; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
+    if ($getMAC) { $host.UI.RawUI.ForegroundColor = "Yellow"; $getMAC; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
     else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-    if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
+    if ($getMAC -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
 
         # Loop an error message until $choice becomes one of the $eValues
     Clear-Host
@@ -484,6 +501,12 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nE - Exit
     $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $resultV4
     $global:selectedName = $result.Name; $global:selectedResult = $result
     }
+}
+
+    # Restart and open Windows Explorer
+function Explorer-RS {
+    if ($parameter) { wmic /node:"$parameter" process call create "powershell.exe Stop-Process -Name explorer -Force; Start-Process explorer" }
+    else { Stop-Process -Name explorer -Force; Start-Process explorer }
 }
 
     # Send a shutdown or restart command to a selected user's computer (could be better)
@@ -700,13 +723,13 @@ while ($true) {
 
         {$_ -in "shutdown","shut","s"} { C; Invoke-Shutdown }
 
-        {$_ -in "exprs","rs"} { C; Stop-Process -Name explorer -Force; Start-Process explorer } # Restart and open Windows Explorer
-
         {$_ -in "file","stat","f"} { C; Invoke-Explorer }
 
         {$_ -in "e", "d"} { C; if ($recentMode) { $recentMode = $false; "Disabled Recent Mode" } }
 
         {$_ -in "config","c"} { C; Invoke-Config }
+
+        {$_ -in "exprs","rs"} { C; Explorer-RS }
 
     }
 
