@@ -151,13 +151,17 @@ function Scan-Create {
             }
         }
 
-        Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
-        $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-
             # Get the domain controller IP and cache it globally
         $global:dcIP = (Resolve-DnsName -Name (Get-ADDomainController).HostName | Select-Object -ExpandProperty IPAddress).ToString()
 
             # Select Ping Mode
+        if ($parameter) {
+            $host.UI.RawUI.ForegroundColor = "Yellow"
+            Write-Host "Selected host is: $parameter"
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        }
+        Write-Host "Do you want to enable host pinging? Y | Yes - N | No"
+        $adInput = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
         switch ($adInput) {
             {$_ -in "y", "e"} { $pingConfig = $true; $adLoop = $false; [System.Console]::Clear(); "Pinging each selected host" }
             {$_ -in "n", "q"} { $pingConfig = $false; $adLoop = $false; [System.Console]::Clear(); "Skipping ping function" }
@@ -174,8 +178,9 @@ function Scan-Create {
             $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
         }
 
-        Write-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -"
-        $input = Read-Host "You can press 'c' while its querying to abort the process`n>"
+        "You can press 'c' while its querying to abort the process`n"
+        if (-not $parameter) { $input = Read-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -`n>" }
+        else { $input = $parameter }
         if (-not $input) {
             [System.Console]::Clear(); break
         } else { [System.Console]::Clear() }
@@ -250,6 +255,7 @@ function Scan-Create {
         }
             # Press C to exit Scan-Create, press S to save the newly made $unitList as $recents, any other key just resets the search
             # (if $unitList is empty, make $recents = $null)
+        $parameter = $null
         Write-Host "`nPress any key to reset or press S to save this list to the recents list`nPress c to return to the command line..."
         $adOption = [System.Console]::ReadKey().Key; [System.Console]::Clear();
         if ($adOption -ieq "c") { break }
