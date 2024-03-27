@@ -13,6 +13,7 @@ $configFile = $tempFile + "\usetilconfig.txt"
 #$workingDir = Get-Location; $workPath = $workingDir.Path
 
 $orig_fg_color = $host.UI.RawUI.ForegroundColor
+$compName = $env:COMPUTERNAME
 
     # Ignores error handling
 function C { $global:correct = $true }
@@ -473,20 +474,29 @@ function Invoke-Explorer {
         # Loop an error message until $choice becomes one of the $eValues
     Clear-Host
     do {
-        if ($qMode) { query session /server:"$mainIP" }
+        if ($qMode) {
+            query session /server:"$mainIP"
+        }
         $choice = $null
         $eValues = @('s','e')
 @"
 `nSelected '$mainIP'`n`nWhat action do you take?`nS - Make the host become the 'Selected Host'
-F - Open the host in file explorer`nQ - Query sessions on the host`nE - Exit 
+F - Open the host in file explorer`nQ - Query sessions on the host`nB - Request info`nE - Exit 
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
         if ($choice -ieq "f") {
             ii \\$mainIP\c$
         } elseif ($choice -ieq "q") {
-            if ($qMode) { $qMode = $false } else { $qMode = $true }
-        }        
+            if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
+        } elseif ($choice -ieq "b") {
+                # Specific directories for the scripts to these features (There's probably a better way)
+            try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
+            if ($infoRequest) {
+                Start-Process powershell.exe \\coachella\isprogs$\Connor\Temp\msgrec.ps1
+                wmic /node:"$mainIP" process call create "powershell.exe -windowstyle hidden \\coachella\isprogs$\Connor\Temp\msgsend.ps1 -IPAddress $compName"
+            } else { "Unable to contact host PC" }
+        }
 
         if (-not $choice) {
             [System.Console]::Clear();
