@@ -458,38 +458,44 @@ function Invoke-Explorer {
         $host.UI.RawUI.ForegroundColor = "Red"
         Write-Host "Unable to contact the selected host"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
-        continue
-    } Clear-Host
+    }
 
     Get-IP $mainIP
-    $result = Get-ADComputer -Identity "$mainIP" -Properties Description | Select-Object Name,Description
-    
-        # Display the name of the ad object and its description then display the mac if it exists.
-        # Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
-    "`n"; $result.Name; $result.Description
-    if ($getMAC) { $host.UI.RawUI.ForegroundColor = "Yellow"; $getMAC; $host.UI.RawUI.ForegroundColor = $orig_fg_color } 
-    else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-    if ($getMAC -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
+    try { $result = Get-ADComputer -Identity "$mainIP" -Properties Description -ErrorAction Stop | Select-Object Name,Description } catch { continue }
 
         # Loop an error message until $choice becomes one of the $eValues
-    Clear-Host
+    #Clear-Host
     do {
         if ($qMode) {
             query session /server:"$mainIP"
         }
+
+            # Display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
+        "`n"; $result.Name; $result.Description
+        if ($getMAC) { $host.UI.RawUI.ForegroundColor = "Yellow"; $getMAC; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+        else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+        if ($getMAC -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }
+
         $choice = $null
         $eValues = @('s','e')
 @"
 `nSelected '$mainIP'`n`nWhat action do you take?`nS - Make the host become the 'Selected Host'
-F - Open the host in file explorer`nQ - Query sessions on the host`nB - Request info`nE - Exit 
+F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-ExecutionPolicy`nB - Request info`nE - Exit 
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
+            # Open an explorer instance in the C$ of the $mainIP
         if ($choice -ieq "f") {
             ii \\$mainIP\c$
-        } elseif ($choice -ieq "q") {
+        }
+
+            # Toggles user query mode
+        elseif ($choice -ieq "q") {
             if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
-        } elseif ($choice -ieq "b") {
+        }
+
+            # Uses 2 external scripts, a recieving one on the local machine, and a senders script that gets their machine info
+        elseif ($choice -ieq "b") {
                 # Specific directories for the scripts to these features (There's probably a better way)
             try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
             if ($infoRequest) {
@@ -497,6 +503,20 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nB - Request 
                 wmic /node:"$mainIP" process call create "powershell.exe -windowstyle hidden \\coachella\isprogs$\Connor\Temp\msgsend.ps1 -IPAddress $compName"
             } else { "Unable to contact host PC" }
         }
+
+            # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
+        elseif ($choice -ieq "p") {
+            Clear-Host
+            "`n"; Write-Host "Press Y to Set-ExecutionPolicy to Bypass`nPress N to set it to Restricted`nPress any other key or leave it blank to exit"
+            $policyChoice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+            Clear-Host
+
+            if ($policyChoice -in "e","y") { wmic /node:"$mainIP" process call create "powershell.exe Set-ExecutionPolicy Bypass" }
+            elseif ($policyChoice -in "q","n") { wmic /node:"$mainIP" process call create "powershell.exe Set-ExecutionPolicy Restricted" }
+            else { Write-Host "No option selected" }
+        }
+
+        
 
         if (-not $choice) {
             [System.Console]::Clear();
