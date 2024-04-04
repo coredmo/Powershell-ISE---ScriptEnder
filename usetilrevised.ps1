@@ -274,35 +274,38 @@ function Scan-Create {
     # Open a recents list and select a host to be the primary computer
 function Invoke-Recents {
     if (-not $unitList) { Write-Host "The recents list is empty" }
-    else {
-        $noArp = $false
-        $noIPV4 = $false
-        Write-Host "Select a unit from your recents list. Press OK in the bottom right once you have selected.`nDomain Controller: $dcIP`n"
-        
-        foreach ($unit in $unitList) {
-            $unitTokens = $unit -split '-', 2; $unitIP = $unitTokens[0].Trim(); $unitName = $unitTokens[1].Trim()
-
-            $result = Get-ADComputer -Identity "$unitName" -Properties Description | Select-Object Name,Description
-
-            $macResult = arp -a | findstr "$unitIP"
+        else {
+        if ($unitList.Count -le 1) { $selectedUnit = $unitList }
+            else {
+            $noArp = $false
+            $noIPV4 = $false
+            Write-Host "Select a unit from your recents list. Press OK in the bottom right once you have selected.`nDomain Controller: $dcIP`n"
             
-            if ($macResult -eq $null -or $macResult -eq '') {
-                $host.UI.RawUI.ForegroundColor = "Yellow"
-                Write-Host "The MAC wasn't in the ARP table"
-                $host.UI.RawUI.ForegroundColor = $orig_fg_color
-            } else { 
-                $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color 
+            foreach ($unit in $unitList) {
+                $unitTokens = $unit -split '-', 2; $unitIP = $unitTokens[0].Trim(); $unitName = $unitTokens[1].Trim()
+
+                $result = Get-ADComputer -Identity "$unitName" -Properties Description | Select-Object Name,Description
+
+                $macResult = arp -a | findstr "$unitIP"
+                
+                if ($macResult -eq $null -or $macResult -eq '') {
+                    $host.UI.RawUI.ForegroundColor = "Yellow"
+                    Write-Host "The MAC wasn't in the ARP table"
+                    $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                } else { 
+                    $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "$macResult`n"; $host.UI.RawUI.ForegroundColor = $orig_fg_color 
+                }
+                
+                if (-not $macResult) { " " + $unitIP + "`n" }; if ($dcIP -contains $unitIP) { "Domain Controller`n" }
+                if (-not $result) { $unitName } else { $result.Name; $result.Description }
+                "`n------------`n"
             }
-            
-            if (-not $macResult) { " " + $unitIP + "`n" }; if ($dcIP -contains $unitIP) { "Domain Controller`n" }
-            if (-not $result) { $unitName } else { $result.Name; $result.Description }
-            "`n------------`n"
+
+            Write-Host "`nPress any key to continue then select OK in the bottom right..."; $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+
+                # Display the list in a grid view window and store the selected item
+            $selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
         }
-
-        Write-Host "`nPress any key to continue then select OK in the bottom right..."; $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-
-            # Display the list in a grid view window and store the selected item
-        $selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
         
         if (-not $selectedUnit) { "No Unit was selected" }
         else {
@@ -500,9 +503,9 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
             try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
             if ($infoRequest) {
                 Start-Process powershell.exe \\coachella\isprogs$\Connor\Temp\msgrec.ps1
-                wmic /node:"$mainIP" process call create "powershell.exe -windowstyle hidden \\coachella\isprogs$\Connor\Temp\msgsend.ps1 -IPAddress $compName"
+                wmic /node:"$mainIP" process call create "powershell.exe \\coachella\isprogs$\Connor\Temp\msgsend.ps1 -IPAddress $compName"
             } else { "Unable to contact host PC" }
-        }
+        } # -windowstyle hidden
 
             # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
         elseif ($choice -ieq "p") {
@@ -515,8 +518,6 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
             elseif ($policyChoice -in "q","n") { wmic /node:"$mainIP" process call create "powershell.exe Set-ExecutionPolicy Restricted" }
             else { Write-Host "No option selected" }
         }
-
-        
 
         if (-not $choice) {
             [System.Console]::Clear();
@@ -618,6 +619,7 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
         # I'd like to remove the while ($choosing) and put a while ($true) (The switch statement makes break slightly tedious (I can prob just put an $exit))
     $choosing = $true
     while ($choosing) {
+        Clear-Host
         switch ($choice) {
             "e" { $global:clear = $true; $choosing = $false; continue }
             "d" { shutdown /a /m $mainIP; "Sent a shutdown cancel command to $mainIP"; $choosing = $false; continue }
@@ -626,6 +628,7 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
                 $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
                     {$_ -in "y","e"} {
+                        Write-Host "Sending the command..."
                         if ($messageMode) {
                             shutdown /f /r /t $time /c $message /m $mainIP; $choosing = $false; "Restarted with message in $time seconds"
                         } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
@@ -639,6 +642,7 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
                 $choice3 = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
                 switch ($choice3) {
                     {$_ -in "y","e"} {
+                        Write-Host "Sending the command..."
                         if ($messageMode) {
                             shutdown /f /r /t $time /c $message /m $mainIP; $choosing = $false; "Restarted with message in $time seconds"
                         } else { shutdown /f /r /t $time /m $mainIP; $choosing = $false; "Restarted the computer in $time seconds" }
@@ -710,6 +714,7 @@ function Ping-Interface {
 }
         #endregion
 
+    # Command Loop
 while ($true) {
     $correct = $false
     $parameter = $null
