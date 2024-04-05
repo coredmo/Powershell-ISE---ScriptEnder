@@ -277,8 +277,6 @@ function Invoke-Recents {
         else {
         if ($unitList.Count -le 1) { $selectedUnit = $unitList }
             else {
-            $noArp = $false
-            $noIPV4 = $false
             Write-Host "Select a unit from your recents list. Press OK in the bottom right once you have selected.`nDomain Controller: $dcIP`n"
             
             foreach ($unit in $unitList) {
@@ -420,7 +418,7 @@ function Get-IP {
 function Invoke-WOL {
     while ($true) {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
-        elseif ($parameter) { Get-IP $parameter; if ($getMAC -match $macRegEX) { $mac = $getMAC; $parameterMode = $true } else { "NO MAC ADDRESS"; break } }
+        elseif ($parameter) { Get-IP $parameter; if ($getMAC -match $macRegEx) { $mac = $getMAC; $parameterMode = $true } else { "NO MAC ADDRESS"; break } }
         elseif ($recentMode) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS"; break } }
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
         if (-not $mac) { Clear-Host; break } elseif ($mac -notmatch $macRegEx) { Clear-Host; "Invalid Input"; break }
@@ -487,7 +485,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
-            # Open an explorer instance in the C$ of the $mainIP
+            # Open an explorer instance in the C: of the $mainIP
         if ($choice -ieq "f") {
             ii \\$mainIP\c$
         }
@@ -689,27 +687,35 @@ function Ping-Interface {
                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
             }
         } while ($eValues -notcontains $choice)
-       
+        [System.Console]::Clear()
+
             # 'e' exits ping mode, 'a' runs the $pingResult a single time, and 'b' opens a prompt with an infinite ping | $n is the choice
         switch ($choice) {
             "e" { $global:clear = $true; return }
             "a" { $n = 1 }
-            "b" { $constPing = $true }
-        } if (-not $constPing) { $pingResult = ping -n $n $pingIP }
-        elseif ($constPing) { $constPing = $false; Start-Process cmd.exe -ArgumentList "/c ping -t $pingIP" }
-                
-        [System.Console]::Clear()
-        ping -n 1 $pingIP
+            "b" { $constPing = $true; $cancel = "c" }
+        } if ($constPing) {
+            $constPing = $false
+            Start-Process cmd.exe -ArgumentList "/c ping -t $pingIP"
+            $host.UI.RawUI.ForegroundColor = "Yellow"
+            Write-Host "Created an infinite ping instance for '$pingIP'"
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        }
         
-        $host.UI.RawUI.ForegroundColor = "Yellow"
-        Write-Host "`nPress any key to restart or press C to return to the console"
-        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        if (-not $cancel) {
+            ping -n 1 $pingIP
+
+            $host.UI.RawUI.ForegroundColor = "Yellow"
+            Write-Host "`nPress any key to restart or press C to return to the console"
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+
+            $cancel = [System.Console]::ReadKey().Key
+            [System.Console]::Clear()
+        }
         
-        $cancel = [System.Console]::ReadKey().Key
-        [System.Console]::Clear()
-        if ($cancel -ieq "c") { $pingOption = $null }
+        if ($cancel -ieq "c") { $pingOption = $null } else { $cancel = $null }
     }
-    [System.Console]::Clear()
+    #[System.Console]::Clear()
     $prePing = $null
 }
         #endregion
