@@ -661,7 +661,7 @@ C - Configure | D - Send a shutdown cancel command | P - Ping the selected host 
 
     # Ping a selected host in different modes
 function Ping-Interface {
-    $pingOption = $true
+    $pingOption = $true; $n = 1
     while ($pingOption) {
         
             # If $parameter is $null and $recentMode is $false, ask for an ip.
@@ -678,10 +678,27 @@ function Ping-Interface {
             # Loop an error message until $choice becomes one of the $eValues
         do {
             $eValues = @('a', 'b', 'e')
-            Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - 1 attempts | B - Indefinite | E - Exit"
+            Write-Host "Pinging '$pingIP'`n`nWhat type of scan do you want?`nA - $n attempts | B - Indefinite | C - Config | E - Exit"
             $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+
+            if ($choice -ieq "c") {
+                while ($true) {
+                    "Enter an amount pings | a number between 0-315360000"
+                    $input = Read-Host ">"
+                    $amount = $input -as [int]
+                    if ($amount -ne $null -and $input -match '^\d+$' -and $amount -ge 1 -and $amount -le 315360000) {
+                        $n = $amount; Write-Host "Set to $amount"; break
+                    } else {
+                        Clear-Host
+                        $host.UI.RawUI.ForegroundColor = "Red"
+                        Write-Host "Invalid input. Please enter a number between 1 and 315360000."
+                        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+                    }
+                } [System.Console]::Clear(); continue
+            }
+
             if ($eValues -notcontains $choice) {
-                [System.Console]::Clear();
+                [System.Console]::Clear()
                 $host.UI.RawUI.ForegroundColor = "Red"
                 Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -692,7 +709,7 @@ function Ping-Interface {
             # 'e' exits ping mode, 'a' runs the $pingResult a single time, and 'b' opens a prompt with an infinite ping | $n is the choice
         switch ($choice) {
             "e" { $global:clear = $true; return }
-            "a" { $n = 1 }
+            "a" { ping -n $n $pingIP }
             "b" { $constPing = $true; $cancel = "c" }
         } if ($constPing) {
             $constPing = $false
@@ -703,8 +720,6 @@ function Ping-Interface {
         }
         
         if (-not $cancel) {
-            ping -n 1 $pingIP
-
             $host.UI.RawUI.ForegroundColor = "Yellow"
             Write-Host "`nPress any key to restart or press C to return to the console"
             $host.UI.RawUI.ForegroundColor = $orig_fg_color
@@ -715,7 +730,6 @@ function Ping-Interface {
         
         if ($cancel -ieq "c") { $pingOption = $null } else { $cancel = $null }
     }
-    #[System.Console]::Clear()
     $prePing = $null
 }
         #endregion
