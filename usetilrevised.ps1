@@ -305,6 +305,7 @@ function Invoke-Recents {
             $selectedUnit = $unitList | Out-GridView -Title "Select a unit" -PassThru
         }
         
+            # Not future proof (lmao (lmfao))
         if (-not $selectedUnit) { "No Unit was selected" }
         else {
             $selectedTokens = $selectedUnit -split '-', 2; $selectedIP = $selectedTokens[0].Trim(); $selectedName = $selectedTokens[1].Trim()
@@ -442,7 +443,7 @@ function Invoke-WOL {
     }
 }
 
-    # Session checker and quick network file explorer
+    # Session checker and quick network file explorer - IF A USER DOESN'T GO TO Invoke-Recents, THE MAC ADDY DOESN"T APPEAR
 function Invoke-Explorer {
     if (-not $parameter) { 
         if (-not $recentMode) {
@@ -473,8 +474,10 @@ function Invoke-Explorer {
 
             # Display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
         "`n"; $result.Name; $result.Description
-        if ($getMAC) { $host.UI.RawUI.ForegroundColor = "Yellow"; $getMAC; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
-        else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
+        $host.UI.RawUI.ForegroundColor = "Yellow"
+        if ($getMAC) { $getMAC }
+        else { " " + $selectedIP }
+        $host.UI.RawUI.ForegroundColor = $orig_fg_color
         if ($getMAC -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }
 
         $choice = $null
@@ -508,7 +511,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
             # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
         elseif ($choice -ieq "p") {
             Clear-Host
-            "`n"; Write-Host "Press Y to Set-ExecutionPolicy to Bypass`nPress N to set it to Restricted`nPress any other key or leave it blank to exit"
+            "`n"; Write-Host "Changing Set-ExecutionPolicy...`nPress Y to set it to Bypass`nPress N to set it to Restricted`nPress any other key or leave it blank to exit"
             $policyChoice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
             Clear-Host
 
