@@ -14,6 +14,11 @@ $configFile = $tempFile + "\usetilconfig.txt"
 
 $orig_fg_color = $host.UI.RawUI.ForegroundColor
 $compName = $env:COMPUTERNAME
+Set-Location $env:USERPROFILE
+
+# Get the IPv4 address of the first enabled Ethernet or Wi-Fi adapter
+$IPgrabbing = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*', 'Wi-Fi*' -PrefixOrigin Dhcp | Select-Object -First 1).IPAddress
+$localIP = $IPgrabbing.ToString()
 
     # Ignores error handling
 function C { $global:correct = $true }
@@ -37,9 +42,12 @@ gpupdate |  gpu  | gp: Run a simple forced group policy update or display the RS
 Requires RSAT Active Directory Module:
 search   |   ad  |  a: Search your active directory's computer descriptions and save objects to a recents list
 recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
-file     | stat  |  f: Session checker and quick network file explorer for a primary or inputted host
+file     | stat  |  f: Session check, open network file explorer, Set-ExecutionPolicy, or use NodeJS to gather info
 
 Often times Y = "e" and N = "q"
+
+NodeJS server requirement: Copy UsetilHTTP file into a file named C:\Temp
+You should have C:\Temp\UsetilHTTP\server.js available for use
 
 - Connor's Scripted Toolkit (ISE Iteration 2 (Not an ISE))-
 https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
@@ -51,6 +59,18 @@ if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($no
 
     # Config reading & functionality
         #region
+    # Function to check if a command exists
+function Test-CommandExists {
+    param($command)
+    $exists = $true
+    try {
+        $null = Get-Command $command -ErrorAction Stop
+    } catch {
+        $exists = $false
+    }
+    return $exists
+}
+
     # Function to read the config file and convert it to a hashtable
 function Read-Config {
     $configHash = @{}
@@ -211,7 +231,7 @@ function Scan-Create {
                 } if ($cancelResult) { break }
                 
                     # Use nslookup to grab the computer's IP (I should update this to a function)
-                Write-Host "$($computer.Name), $($computer.Description)"
+                Write-Host " - $($computer.Name), $($computer.Description)"
                 $nsResult = nslookup $($computer.Name)
                 $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
                 $resultV4 = [regex]::Matches($nsResult, $nsRegex)
@@ -443,7 +463,7 @@ function Invoke-WOL {
     }
 }
 
-    # Session checker and quick network file explorer - IF A USER DOESN'T GO TO Invoke-Recents, THE MAC ADDY DOESN"T APPEAR
+    # Session check, open network file explorer, Set-ExecutionPolicy, or use NodeJS to gather info
 function Invoke-Explorer {
     if (-not $parameter) { 
         if (-not $recentMode) {
@@ -484,7 +504,7 @@ function Invoke-Explorer {
         $eValues = @('s','e')
 @"
 `nSelected '$mainIP'`n`nWhat action do you take?`nS - Make the host become the 'Selected Host'
-F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-ExecutionPolicy`nB - Request info`nE - Exit 
+F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-ExecutionPolicy`nB - Request info (Read Help for requirements)`nE - Exit 
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
@@ -498,15 +518,26 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
             if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
         }
 
-            # Uses 2 external scripts, a recieving one on the local machine, and a senders script that gets their machine info
+            # Uses scripts and an HTTPS server to gather info from a host (Requires C:\Temp\UsetilHTTP\server.js)
         elseif ($choice -ieq "b") {
-                # Specific directories for the scripts to these features (There's probably a better way)
+                # Check if Node.js is installed. If it isn't, install it using winget
+            if (-not (Test-CommandExists "node")) {
+                Write-Output "Node.js is not installed. Installing via winget..."
+                winget install nodejs
+            } else { "NodeJS is installed" }
+
             try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
             if ($infoRequest) {
-                Start-Process powershell.exe \\coachella\isprogs$\Connor\Temp\msgrec.ps1
-                wmic /node:"$mainIP" process call create "powershell.exe \\coachella\isprogs$\Connor\Temp\msgsend.ps1 -IPAddress $compName"
+                    # Variablized for readability
+                $arg1 = "/c wmic /node:`"" + $mainIP +"`" process call create `"cmd.exe /c (if exist C:\Temp (cd C:\Temp) else (cd C:\ && mkdir C:\Temp && cd C:\Temp))"
+                $arg2 = "&& echo ----- >> cpuinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> cpuinfo.txt "
+                $arg3 = "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt"
+                $arg4 = " && curl -H \`"Content-Type: text/plain\`" --data-binary @cpuinfo.txt http://" + $compName + ":3000/upload && del cpuinfo.txt`""
+                $args = $arg1 + $arg2 + $arg3 + $arg4
+                try { Start-Process "cmd.exe" -ArgumentList "/k node C:\Temp\UsetilHTTP\server.js" -ErrorAction Stop } catch { $_.ErrorCode; $disableWMIC = $true}
+                if (-not $disableWMIC) { Start-Process "cmd.exe" -ArgumentList $args }
             } else { "Unable to contact host PC" }
-        } # -windowstyle hidden
+        }
 
             # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
         elseif ($choice -ieq "p") {
@@ -526,7 +557,9 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
             Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
             $host.UI.RawUI.ForegroundColor = $orig_fg_color
         } Clear-Host
+        if ($disableWMIC) { "WMIC process call is disabled because server.js does not exist" }
     } while ($eValues -notcontains $choice)
+
     if ($choice -ieq "s") {
         # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
     $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $resultV4
@@ -716,7 +749,7 @@ function Ping-Interface {
             "b" { $constPing = $true; $cancel = "c" }
         } if ($constPing) {
             $constPing = $false
-            Start-Process cmd.exe -ArgumentList "/c ping -t $pingIP"
+            Start-Process cmd.exe -ArgumentList "/c echo Pinging: $pingIp & ping -t $pingIP"
             $host.UI.RawUI.ForegroundColor = "Yellow"
             Write-Host "Created an infinite ping instance for '$pingIP'"
             $host.UI.RawUI.ForegroundColor = $orig_fg_color
