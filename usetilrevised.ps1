@@ -94,12 +94,10 @@ function Toggle-Setting {
         $newValue = if ($currentValue -eq "True") { "False" } else { "True" }
         $config[$settingName] = $newValue
 
-            # Prepare the updated config content
         $updatedConfigContent = $config.GetEnumerator() | ForEach-Object {
             "$($_.Key): $($_.Value)"
         }
 
-            # Write the updated config back to the file
         $updatedConfigContent | Out-File -FilePath $configFile -Force
     } else {
         "Setting '$settingName' not found."
@@ -435,7 +433,7 @@ function Get-IP {
     if ($arpResult -match $macRegEx) { $global:getMAC = $matches[0] }
 }
 
-    # Send a magic packet to a MAC Address, UDP via port 7
+    # Send a magic packet to a MAC Address, UDP via port 7 (This looks like crap)
 function Invoke-WOL {
     while ($true) {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
@@ -509,54 +507,56 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
             # Open an explorer instance in the C: of the $mainIP
-        if ($choice -ieq "f") {
-            ii \\$mainIP\c$
-        }
+        switch ($choice) {
+            {$choice -in "f"} {
+                ii \\$mainIP\c$
+            }
 
-            # Toggles user query mode
-        elseif ($choice -ieq "q") {
-            if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
-        }
+                # Toggles user query mode
+            {$choice -in "q"} {
+                if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
+            }
 
-            # Uses scripts and an HTTPS server to gather info from a host (Requires C:\Temp\UsetilHTTP\server.js)
-        elseif ($choice -ieq "b") {
-                # Check if Node.js is installed. If it isn't, install it using winget
-            if (-not (Test-CommandExists "node")) {
-                Write-Output "Node.js is not installed. Installing via winget..."
-                winget install nodejs
-            } else { "NodeJS is installed" }
+                # Uses scripts and an HTTPS server to gather info from a host (Requires C:\Temp\UsetilHTTP\server.js)
+            {$choice -in "b"} {
+                if (-not (Test-CommandExists "node")) {
+                    Write-Output "Node.js is not installed. Installing via winget..."
+                    winget install nodejs
+                } else { "NodeJS is installed" }
 
-            try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
-            if ($infoRequest) {
-                    # Variablized for readability
-                $arg1 = "/c wmic /node:`"" + $mainIP +"`" process call create `"cmd.exe /c (if exist C:\Temp (cd C:\Temp) else (cd C:\ && mkdir C:\Temp && cd C:\Temp))"
-                $arg2 = "&& echo ----- >> cpuinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> cpuinfo.txt "
-                $arg3 = "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt"
-                $arg4 = " && curl -H \`"Content-Type: text/plain\`" --data-binary @cpuinfo.txt http://" + $compName + ":3000/upload && del cpuinfo.txt`""
-                $args = $arg1 + $arg2 + $arg3 + $arg4
-                try { Start-Process "cmd.exe" -ArgumentList "/k node C:\Temp\UsetilHTTP\server.js" -ErrorAction Stop } catch { $_.ErrorCode; $disableWMIC = $true}
-                if (-not $disableWMIC) { Start-Process "cmd.exe" -ArgumentList $args }
-            } else { "Unable to contact host PC" }
-        }
+                try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
+                if ($infoRequest) {
+                    $arg1 = "/c wmic /node:`"" + $mainIP +"`" process call create `"cmd.exe /c (if exist C:\Temp (cd C:\Temp) else (cd C:\ && mkdir C:\Temp && cd C:\Temp))"
+                    $arg2 = "&& echo ----- >> cpuinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> cpuinfo.txt "
+                    $arg3 = "&& echo ----- >> cpuinfo.txt && wmic bios get serialnumber >> cpuinfo.txt && echo ----- >> cpuinfo.txt "
+                    $arg4 = "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt "
+                    $arg5 = "&& curl -H \`"Content-Type: text/plain\`" --data-binary @cpuinfo.txt http://" + $compName + ":3000/upload && del cpuinfo.txt`""
+                    $args = $arg1 + $arg2 + $arg3 + $arg4 + $arg5
+                    try { Start-Process "cmd.exe" -ArgumentList "/k node C:\Temp\UsetilHTTP\server.js" -ErrorAction Stop } catch { $_.ErrorCode; $disableWMIC = $true}
+                    if (-not $disableWMIC) { Start-Process "cmd.exe" -ArgumentList $args }
+                } else { "Unable to contact host PC" }
+            }
 
-            # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
-        elseif ($choice -ieq "p") {
-            Clear-Host
-            "`n"; Write-Host "Changing Set-ExecutionPolicy...`nPress Y to set it to Bypass`nPress N to set it to Restricted`nPress any other key or leave it blank to exit"
-            $policyChoice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-            Clear-Host
+                # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
+            {$choice -ieq "p"} {
+                Clear-Host
+                "`n"; Write-Host "Changing Set-ExecutionPolicy...`nPress Y to set it to Bypass`nPress N to set it to Restricted`nPress any other key or leave it blank to exit"
+                $policyChoice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
+                Clear-Host
 
-            if ($policyChoice -in "e","y") { wmic /node:"$mainIP" process call create "powershell.exe Set-ExecutionPolicy Bypass" }
-            elseif ($policyChoice -in "q","n") { wmic /node:"$mainIP" process call create "powershell.exe Set-ExecutionPolicy Restricted" }
-            else { Write-Host "No option selected" }
-        }
+                if ($policyChoice -in "e","y") { wmic /node:"$mainIP" process call create "powershell.exe Set-ExecutionPolicy Bypass" }
+                elseif ($policyChoice -in "q","n") { wmic /node:"$mainIP" process call create "powershell.exe Set-ExecutionPolicy Restricted" }
+                else { Write-Host "No option selected" }
+            }
 
-        if (-not $choice) {
-            [System.Console]::Clear();
-            $host.UI.RawUI.ForegroundColor = "Red"
-            Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
-            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            {-not $choice} {
+                [System.Console]::Clear();
+                $host.UI.RawUI.ForegroundColor = "Red"
+                Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
+                $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            }
         } Clear-Host
+
         if ($disableWMIC) { "WMIC process call is disabled because server.js does not exist" }
     } while ($eValues -notcontains $choice)
 
@@ -788,6 +788,7 @@ while ($true) {
     if ($choice -ieq "a command") { C; ":D"; continue }
     #if ($choice -ieq "q") { C; "No"; continue }
     
+        # This is worthless now that I can toss a parameter to a function (I'll do that in usetil iteration 3)
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     $parameter = $tokens[1]
