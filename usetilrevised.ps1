@@ -1,4 +1,4 @@
-﻿# A convenient bundle of scripted utilities - Created by Connor (:
+﻿# A convenient bundle of scripted utilities - Created by Connor (: - ISE (LMAO) GEN 2
 
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
@@ -433,7 +433,7 @@ function Get-IP {
     if ($arpResult -match $macRegEx) { $global:getMAC = $matches[0] }
 }
 
-    # Send a magic packet to a MAC Address, UDP via port 7 (This looks like crap)
+    # Send a magic packet to a MAC Address, UDP via port 7 (Hrm)
 function Invoke-WOL {
     while ($true) {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
@@ -449,7 +449,7 @@ function Invoke-WOL {
                 $udpClient.Connect(([System.Net.IPAddress]::Broadcast),7)
                 $udpResult = $udpClient.Send($MagicPacket,$MagicPacket.Length)
                 $udpClient.Close()
-                Write-Host "$udpResult | $mac --- $macByteArray"
+                Write-Host "$udpResult | $mac"
                 Start-Sleep -Milliseconds 1000
                 if ($recentMode -or $parameterMode) { break }
             } catch [System.Net.Sockets.SocketException] {
@@ -483,15 +483,11 @@ function Invoke-Explorer {
     Get-IP $mainIP
     try { $result = Get-ADComputer -Identity "$mainIP" -Properties Description -ErrorAction Stop | Select-Object Name,Description } catch { continue }
 
-        # Loop an error message until $choice becomes one of the $eValues
-    #Clear-Host
     do {
-        if ($qMode) {
-            query session /server:"$mainIP"
-        }
+        if ($qMode) { query session /server:"$mainIP" }
 
-            # Display the mac if it exists. Otherwise just display the IPv4 (both in yellow). If $mac contains a MAC, make $macAddress.
         "`n"; $result.Name; $result.Description
+
         $host.UI.RawUI.ForegroundColor = "Yellow"
         if ($getMAC) { $getMAC }
         else { " " + $selectedIP }
@@ -506,8 +502,9 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
-            # Open an explorer instance in the C: of the $mainIP
         switch ($choice) {
+
+                # Open an explorer instance in the C: of the $mainIP
             {$choice -in "f"} {
                 ii \\$mainIP\c$
             }
@@ -518,6 +515,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
             }
 
                 # Uses scripts and an HTTPS server to gather info from a host (Requires C:\Temp\UsetilHTTP\server.js)
+                # This will cause a box to pop up and use systeminfo on the host's PC, I need to use visual basic or some other shenanigains to get that hidden.
             {$choice -in "b"} {
                 if (-not (Test-CommandExists "node")) {
                     Write-Output "Node.js is not installed. Installing via winget..."
@@ -558,6 +556,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
         } Clear-Host
 
         if ($disableWMIC) { "WMIC process call is disabled because server.js does not exist" }
+
     } while ($eValues -notcontains $choice)
 
     if ($choice -ieq "s") {
@@ -749,7 +748,7 @@ function Ping-Interface {
             "b" { $constPing = $true; $cancel = "c" }
         } if ($constPing) {
             $constPing = $false
-            Start-Process cmd.exe -ArgumentList "/c echo Pinging: $pingIp & ping -t $pingIP"
+            Start-Process cmd.exe -ArgumentList "/k echo Pinging: $pingIp & ping -t $pingIP"
             $host.UI.RawUI.ForegroundColor = "Yellow"
             Write-Host "Created an infinite ping instance for '$pingIP'"
             $host.UI.RawUI.ForegroundColor = $orig_fg_color
