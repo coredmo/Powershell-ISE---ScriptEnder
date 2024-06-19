@@ -42,7 +42,7 @@ gpupdate |  gpu  | gp: Run a simple forced group policy update or display the RS
 Requires RSAT Active Directory Module:
 search   |   ad  |  a: Search your active directory's computer descriptions and save objects to a recents list
 recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
-file     | stat  |  f: Session check, open network file explorer, Set-ExecutionPolicy, or use NodeJS to gather info
+file     | stat  |  f: Session check, open network file explorer, Set-ExecutionPolicy, or gather info
 
 Often times Y = "e" and N = "q"
 
@@ -514,12 +514,12 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
                 if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
             }
 
-                # Used scripts and an HTTPS server to gather info from a host (Requires C:\Temp\UsetilHTTP\server.js)
+                # Used scripts and an HTTPS server to gather info from a host (Required C:\Temp\UsetilHTTP\server.js)
             {$choice -in "b"} {
-                if (-not (Test-CommandExists "node")) {
-                    Write-Output "Node.js is not installed. Installing via winget..."
-                    winget install nodejs
-                } else { "NodeJS is installed" }
+                #if (-not (Test-CommandExists "node")) {
+                #    Write-Output "Node.js is not installed. Installing via winget..."
+                #    winget install nodejs
+                #} else { "NodeJS is installed" }
 
                 try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
                 if ($infoRequest) {
