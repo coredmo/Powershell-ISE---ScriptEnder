@@ -1,4 +1,4 @@
-﻿# A convenient bundle of scripted utilities - Created by Connor (: - ISE (LMAO) GEN 2
+﻿# A convenient bundle of scripted utilities - Created by Connor (: - GEN 3
 
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
@@ -370,7 +370,6 @@ function Terminal {
         $tchoose2 = [System.Console]::ReadKey().Key
         [System.Console]::Clear()
         if ($tchoose2 -ieq "Enter") { return }
-        if ($tchoose2 -in "y","n") { continue }
         elseif ($tchoose2 -in $tanswers) { break }
     }
 
@@ -439,15 +438,16 @@ function Invoke-WOL {
         if ($parameter -match $macRegEx) { $mac = $parameter; $parameterMode = $true }
         elseif ($parameter) { Get-IP $parameter; if ($getMAC -match $macRegEx) { $mac = $getMAC; $parameterMode = $true } else { "NO MAC ADDRESS"; break } }
         elseif ($recentMode) { if ($selectedMAC) { "Sending a packet to $selectedName - " + $selectedMAC; $mac = $selectedMAC } else { "NO MAC ADDRESS"; break } }
+
         else { $mac = Read-Host "Input a MAC Address or leave it blank to return" }
         if (-not $mac) { Clear-Host; break } elseif ($mac -notmatch $macRegEx) { Clear-Host; "Invalid Input"; break }
         else {
             try {
                 $macByteArray = $mac -split "[:-]" | ForEach-Object { [Byte] "0x$_"}
-                [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray  * 16)
+                [Byte[]] $magicPacket = (,0xFF * 6) + ($macByteArray * 16)
                 $udpClient = New-Object System.Net.Sockets.UdpClient
                 $udpClient.Connect(([System.Net.IPAddress]::Broadcast),7)
-                $udpResult = $udpClient.Send($MagicPacket,$MagicPacket.Length)
+                $udpResult = $udpClient.Send($magicPacket,$magicPacket.Length)
                 $udpClient.Close()
                 Write-Host "$udpResult | $mac"
                 Start-Sleep -Milliseconds 1000
@@ -514,8 +514,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
                 if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
             }
 
-                # Uses scripts and an HTTPS server to gather info from a host (Requires C:\Temp\UsetilHTTP\server.js)
-                # This will cause a box to pop up and use systeminfo on the host's PC, I need to use visual basic or some other shenanigains to get that hidden.
+                # Used scripts and an HTTPS server to gather info from a host (Requires C:\Temp\UsetilHTTP\server.js)
             {$choice -in "b"} {
                 if (-not (Test-CommandExists "node")) {
                     Write-Output "Node.js is not installed. Installing via winget..."
@@ -527,12 +526,18 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
                     $arg1 = "/c wmic /node:`"" + $mainIP +"`" process call create `"cmd.exe /c (if exist C:\Temp (cd C:\Temp) else (cd C:\ && mkdir C:\Temp && cd C:\Temp))"
                     $arg2 = "&& echo ----- >> cpuinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> cpuinfo.txt "
                     $arg3 = "&& echo ----- >> cpuinfo.txt && wmic bios get serialnumber >> cpuinfo.txt && echo ----- >> cpuinfo.txt "
-                    $arg4 = "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt "
-                    $arg5 = "&& curl -H \`"Content-Type: text/plain\`" --data-binary @cpuinfo.txt http://" + $compName + ":3000/upload && del cpuinfo.txt`""
-                    $args = $arg1 + $arg2 + $arg3 + $arg4 + $arg5
-                    try { Start-Process "cmd.exe" -ArgumentList "/k node C:\Temp\UsetilHTTP\server.js" -ErrorAction Stop } catch { $_.ErrorCode; $disableWMIC = $true}
-                    if (-not $disableWMIC) { Start-Process "cmd.exe" -ArgumentList $args }
-                } else { "Unable to contact host PC" }
+                    $arg4 = "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"IPv4 Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt `"" 
+                    #$arg5 = "&& curl -H \`"Content-Type: text/plain\`" --data-binary @cpuinfo.txt http://" + $compName + ":3000/upload && del cpuinfo.txt`"" # REMOVE THE `" ^^
+                    $args = $arg1 + $arg2 + $arg3 + $arg4# + $arg5
+                    #try { Start-Process "cmd.exe" -ArgumentList "/k node C:\Temp\UsetilHTTP\server.js" -ErrorAction Stop } catch { $_.ErrorCode; $disableWMIC = $true}
+                    if (-not $disableWMIC) { "Processing..."
+                        Start-Process "cmd.exe" -ArgumentList $args
+                        Start-Sleep -Milliseconds 3500
+                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt"
+                        Start-Sleep -Milliseconds 1000
+                        Remove-Item -Path "\\$mainIP\c$\Temp\cpuinfo.txt"
+                    }
+                } else { "Unable to contact host PC" }                
             }
 
                 # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
@@ -785,9 +790,8 @@ while ($true) {
     $choice = Read-Host ">"; $choice = $choice.Trim()
     [System.Console]::Clear()
     if ($choice -ieq "a command") { C; ":D"; continue }
-    #if ($choice -ieq "q") { C; "No"; continue }
     
-        # This is worthless now that I can toss a parameter to a function (I'll do that in usetil iteration 3)
+        # This will be rendered worthless now that I know I can toss a parameter to a function (I'll do that in usetil iteration 4)
     $tokens = $choice -split '\s+', 2
     $choice = $tokens[0]
     $parameter = $tokens[1]
