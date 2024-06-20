@@ -474,14 +474,15 @@ function Invoke-Explorer {
     if ($option -eq $false) { Clear-Host; continue } Clear-Host
 
     Write-Host "Testing connection..."
-    try { Test-Connection $mainIP -Count 1 -ErrorAction Stop } catch { Clear-Host
+    try { Test-Connection $mainIP -Count 1 -ErrorAction Stop; "`n"; $pingup = $true } catch {
+        Clear-Host
         $host.UI.RawUI.ForegroundColor = "Red"
         Write-Host "Unable to contact the selected host"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
     }
 
     Get-IP $mainIP
-    try { $result = Get-ADComputer -Identity "$mainIP" -Properties Description -ErrorAction Stop | Select-Object Name,Description } catch { continue }
+    try { $result = Get-ADComputer -Identity "$mainIP" -Properties Description -ErrorAction Stop | Select-Object Name,Description } catch { if (-not $pingup) { continue } }
 
     do {
         if ($qMode) { query session /server:"$mainIP" }
