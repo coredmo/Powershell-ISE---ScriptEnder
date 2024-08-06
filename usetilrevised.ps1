@@ -38,6 +38,7 @@ shutdown | shut  |  s: Restart a selected host or primary computer using the shu
 ping     |          p: Ping a selected host or primary computer in 3 different modes
 exprs    |         rs: Restart and open Windows Explorer: exprs (on local device) | exprs <IPv4> (on network host)
 gpupdate |  gpu  | gp: Run a simple forced group policy update or display the RSoP summary data
+onedrive |   od  |  o: Check if a user on a remote PC has their OneDrive backing their files up
 
 Requires RSAT Active Directory Module:
 search   |   ad  |  a: Search your active directory's computer descriptions and save objects to a recents list
@@ -46,12 +47,13 @@ file     | stat  |  f: Session check, open network file explorer, Set-ExecutionP
 
 Often times Y = "e" and N = "q"
 
-NodeJS server requirement: Copy UsetilHTTP file into a file named C:\Temp
-You should have C:\Temp\UsetilHTTP\server.js available for use
-
 - Connor's Scripted Toolkit (ISE Iteration 2 (Not an ISE))-
 https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 "@
+
+#NodeJS server requirement: Copy UsetilHTTP file into a file named C:\Temp
+#You should have C:\Temp\UsetilHTTP\server.js available for use
+
 Write-Host "Press enter to return..."
 $noid = Read-Host -Debug; Clear-Host
 if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($noid -ieq " ") { Write-Host "dingus" }
@@ -473,6 +475,19 @@ function Invoke-Explorer {
         } else { $mainIP = $parameter }
     if ($option -eq $false) { Clear-Host; continue } Clear-Host
 
+    # Get all directories in the base directory
+    $userDirs = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory
+    
+    # Find the most recently modified directory
+    $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    
+    # Extract the name of the most recently modified directory
+    $mostRecentDirName = $mostRecentDir.Name
+
+    # Find the Active Directory account correlated with the directory name
+    $user = Get-ADUser -Filter {sAMAccountName -eq $mostRecentDirName} -Properties DisplayName
+    $fullName = $user.DisplayName
+
     Write-Host "Testing connection..."
     try { Test-Connection $mainIP -Count 1 -ErrorAction Stop; "`n"; $pingup = $true } catch {
         Clear-Host
@@ -487,7 +502,7 @@ function Invoke-Explorer {
     do {
         if ($qMode) { query session /server:"$mainIP" }
 
-        "`n"; $result.Name; $result.Description
+        "`n"; $result.Name; $result.Description; "`nMost Recent User:`n$mostRecentDirName - $fullName`n"
 
         $host.UI.RawUI.ForegroundColor = "Yellow"
         if ($getMAC) { $getMAC }
@@ -499,7 +514,7 @@ function Invoke-Explorer {
         $eValues = @('s','e')
 @"
 `nSelected '$mainIP'`n`nWhat action do you take?`nS - Make the host become the 'Selected Host'
-F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-ExecutionPolicy`nB - Request info (Read Help for requirements)`nE - Exit 
+F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-ExecutionPolicy`nB - Request info`nE - Exit 
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
@@ -533,7 +548,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
                     #try { Start-Process "cmd.exe" -ArgumentList "/k node C:\Temp\UsetilHTTP\server.js" -ErrorAction Stop } catch { $_.ErrorCode; $disableWMIC = $true}
                     if (-not $disableWMIC) { "Processing..."
                         Start-Process "cmd.exe" -ArgumentList $args
-                        Start-Sleep -Milliseconds 3500
+                        Start-Sleep -Milliseconds 4000
                         Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt"
                         Start-Sleep -Milliseconds 1000
                         Remove-Item -Path "\\$mainIP\c$\Temp\cpuinfo.txt"
@@ -773,6 +788,57 @@ function Ping-Interface {
     }
     $prePing = $null
 }
+
+function OneDrive-Status {
+    if (!$parameter) {
+        $hostname = Read-Host "Enter the device name"
+    } else { $hostname = $parameter }
+    $compName = "\\" + $hostname
+    $compFit = $compName.TrimStart('\')
+
+    $mostRecentDirName = Read-Host "Enter the username you want to query or leave it blank to select the most recent user"
+    
+    if (!$mostRecentDirName) {
+        # Get all directories in the base directory
+        $userDirs = Get-ChildItem -Path "$compName\C$\Users" -Directory
+        
+        # Find the most recently modified directory
+        $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        
+        # Extract the name of the most recently modified directory
+        $mostRecentDirName = $mostRecentDir.Name
+    }
+    
+    $userProfilePath = "$compName\C$\Users\$mostRecentDirName"
+
+    $tempPath = "OneDrive"
+    
+    $oneDriveDesktopPath = "$userProfilePath\$tempPath\Desktop"
+    $oneDriveDocumentsPath = "$userProfilePath\$tempPath\Documents"
+    $oneDrivePicturesPath = "$userProfilePath\$tempPath\Pictures"
+
+    function Check-OneDriveSync {
+        param (
+            [string]$folderPath
+        )
+    
+        if (Test-Path -Path $folderPath) {
+            $global:ODresultList += @("$folderPath is being synced with OneDrive.")
+            $global:ODconfirmation += @("True")
+        } else {
+            $global:ODresultList += @("$folderPath is not being synced with OneDrive.")
+            $global:ODconfirmation += @("False")
+        }
+    }
+    
+    Check-OneDriveSync -folderPath $oneDriveDesktopPath
+    Check-OneDriveSync -folderPath $oneDriveDocumentsPath
+    Check-OneDriveSync -folderPath $oneDrivePicturesPath
+    
+    Clear-Host
+    "$compFit - $mostRecentDirName`n",$ODresultList,"$ODconfirmation","---`n"
+    $global:ODresultList,$global:ODconfirmation = $null
+    }
         #endregion
 
     # Command Loop
@@ -819,6 +885,8 @@ while ($true) {
         {$_ -in "shutdown","shut","s"} { C; Invoke-Shutdown }
 
         {$_ -in "file","stat","f"} { C; Invoke-Explorer }
+
+        {$_ -in "onedrive","od","o"} { C; OneDrive-Status }
 
         {$_ -in "e", "d"} { C; if ($recentMode) { $recentMode = $false; "Disabled Recent Mode" } }
 
