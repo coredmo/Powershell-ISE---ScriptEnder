@@ -792,6 +792,7 @@ function Ping-Interface {
 function OneDrive-Status {
     if (!$parameter) {
         $hostname = Read-Host "Enter the device name"
+        if (!$hostname) { Clear-Host; "Cancelled..."; break }
     } else { $hostname = $parameter }
     $compName = "\\" + $hostname
     $compFit = $compName.TrimStart('\')
@@ -800,7 +801,8 @@ function OneDrive-Status {
     
     if (!$mostRecentDirName) {
         # Get all directories in the base directory
-        $userDirs = Get-ChildItem -Path "$compName\C$\Users" -Directory
+        try { $userDirs = Get-ChildItem -Path "$compName\C$\Users" -Directory -ErrorAction Stop }
+        catch { Clear-Host; Write-Output "An error occurred: $($_.Exception.Message)"; break }
         
         # Find the most recently modified directory
         $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -835,7 +837,7 @@ function OneDrive-Status {
     Check-OneDriveSync -folderPath $oneDriveDocumentsPath
     Check-OneDriveSync -folderPath $oneDrivePicturesPath
     
-    Clear-Host
+    #Clear-Host
     "$compFit - $mostRecentDirName`n",$ODresultList,"$ODconfirmation","---`n"
     $global:ODresultList,$global:ODconfirmation = $null
     }
