@@ -344,7 +344,7 @@ function Invoke-Recents {
             else { $host.UI.RawUI.ForegroundColor = "Yellow"; " " + $selectedIP; $host.UI.RawUI.ForegroundColor = $orig_fg_color }
             if ($mac -match '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}') { $macAddress = $matches[0] }; "`n"
             
-                # $selectedIP - nslookup Results | $selectedName - AD Object Name | $selectedResult - AD Object Description
+                # $selectedIP - nslookup Results | $selectedName - AD Computer Object Name | $selectedResult - AD Object Description
             $global:recentMode = $true; $global:selectedMAC = $macAddress; $global:selectedIP = $selectedIP
             $global:selectedName = $selectedName; $global:selectedResult = $result
 
@@ -475,25 +475,28 @@ function Invoke-Explorer {
         } else { $mainIP = $parameter }
     if ($option -eq $false) { Clear-Host; continue } Clear-Host
 
-    # Get all directories in the base directory
-    $userDirs = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory
-    
-    # Find the most recently modified directory
-    $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    
-    # Extract the name of the most recently modified directory
-    $mostRecentDirName = $mostRecentDir.Name
-
-    # Find the Active Directory account correlated with the directory name
-    $user = Get-ADUser -Filter {sAMAccountName -eq $mostRecentDirName} -Properties DisplayName
-    $fullName = $user.DisplayName
-
     Write-Host "Testing connection..."
-    try { Test-Connection $mainIP -Count 1 -ErrorAction Stop; "`n"; $pingup = $true } catch {
+    try { Test-Connection $mainIP -Count 1 -ErrorAction Stop; "`n"; $pingup = $true }
+    catch {
         Clear-Host
         $host.UI.RawUI.ForegroundColor = "Red"
         Write-Host "Unable to contact the selected host"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
+    }
+
+    if ($pingup) {
+        # Get all directories in the base directory
+        $userDirs = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory
+        
+        # Find the most recently modified directory
+        $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        
+        # Extract the name of the most recently modified directory
+        $mostRecentDirName = $mostRecentDir.Name
+
+        # Find the Active Directory account correlated with the directory name
+        $user = Get-ADUser -Filter {sAMAccountName -eq $mostRecentDirName} -Properties DisplayName
+        $fullName = $user.DisplayName
     }
 
     Get-IP $mainIP
@@ -501,6 +504,12 @@ function Invoke-Explorer {
 
     do {
         if ($qMode) { query session /server:"$mainIP" }
+        if ($usersMode) {
+            $users = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory
+            foreach ($obj in $users) {
+                "---", $obj.Name, $obj.LastAccessTime.ToString()
+            }
+        }
 
         "`n"; $result.Name; $result.Description; "`nMost Recent User:`n$mostRecentDirName - $fullName`n"
 
@@ -514,24 +523,28 @@ function Invoke-Explorer {
         $eValues = @('s','e')
 @"
 `nSelected '$mainIP'`n`nWhat action do you take?`nS - Make the host become the 'Selected Host'
-F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-ExecutionPolicy`nB - Request info`nE - Exit 
+F - Open the host in file explorer`nQ - Query sessions on the host`nU - List users folder`nP - Set-ExecutionPolicy`nB - Request info`nE - Exit 
 "@
         $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
 
         switch ($choice) {
 
                 # Open an explorer instance in the C: of the $mainIP
-            {$choice -in "f"} {
+            {$_ -in "f"} {
                 ii \\$mainIP\c$
             }
 
                 # Toggles user query mode
-            {$choice -in "q"} {
-                if ($qMode) { $qMode = $false; $winInfo = $null } else { $qMode = $true }
+            {$_ -in "q"} {
+                if ($qMode) { $qMode = $false } else { $qMode = $true }
+            }
+
+            {$_ -in "u"} {
+                if ($usersMode) { $usersMode = $false } else { $usersMode = $true }
             }
 
                 # Used scripts and an HTTPS server to gather info from a host (Required C:\Temp\UsetilHTTP\server.js)
-            {$choice -in "b"} {
+            {$_ -in "b"} {
                 #if (-not (Test-CommandExists "node")) {
                 #    Write-Output "Node.js is not installed. Installing via winget..."
                 #    winget install nodejs
@@ -557,7 +570,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nP - Set-Exec
             }
 
                 # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
-            {$choice -ieq "p"} {
+            {$_ -ieq "p"} {
                 Clear-Host
                 "`n"; Write-Host "Changing Set-ExecutionPolicy...`nPress Y to set it to Bypass`nPress N to set it to Restricted`nPress any other key or leave it blank to exit"
                 $policyChoice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
@@ -790,15 +803,16 @@ function Ping-Interface {
 }
 
 function OneDrive-Status {
-    if (!$parameter) {
+    if (!$parameter -and !$recentMode) {
         $hostname = Read-Host "Enter the device name"
         if (!$hostname) { Clear-Host; "Cancelled..."; break }
-    } else { $hostname = $parameter }
+    } elseif ($parameter) { $hostname = $parameter }
+    else { $hostname = $selectedName }
+
     $compName = "\\" + $hostname
     $compFit = $compName.TrimStart('\')
 
-    $mostRecentDirName = Read-Host "Enter the username you want to query or leave it blank to select the most recent user"
-    
+    $mostRecentDirName = Read-Host "Enter the username you want to query or leave it blank to select the most recent user"; Clear-Host
     if (!$mostRecentDirName) {
         # Get all directories in the base directory
         try { $userDirs = Get-ChildItem -Path "$compName\C$\Users" -Directory -ErrorAction Stop }
