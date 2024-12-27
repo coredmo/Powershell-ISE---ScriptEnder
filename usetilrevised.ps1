@@ -572,10 +572,29 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
 
                     if (-not $disableWMIC) { "Processing..."
                         Start-Process "cmd.exe" -ArgumentList $args
-                        $cpuInfo = wmic /node:"$mainIP" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
+                        $rawcpuInfo = wmic /node:"$mainIP" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
+                        $lines = $rawcpuInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+
+                        $header = $lines[0] -split "\s{2,}"
+                        $data = $lines[1..($lines.Length - 1)] -join "`n"
+                        
+                        $cpuInfo = $data | ForEach-Object {
+                            $values = $_ -split "\s{2,}"
+                            [PSCustomObject]@{
+                                MaxClockSpeed = $values[0]
+                                Name = $values[1]
+                                NumberOfCores = $values[2]
+                                NumberOfLogicalProcessors = $values[3]
+                            }
+                        }
+                        
+                        $formattedOutput = $cpuInfo | ForEach-Object {
+                            "Name: $($_.Name), Cores: $($_.NumberOfCores), Logical Processors: $($_.NumberOfLogicalProcessors), Max Clock Speed: $($_.MaxClockSpeed) MHz"
+                        }
+
                         #Start-Process "cmd.exe" -ArgumentList $cpuInfo
                         Start-Sleep -Milliseconds 4000
-                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt && echo $cpuInfo"
+                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt && echo $formattedOutput"
                         Start-Sleep -Milliseconds 2000
                         Remove-Item -Path "\\$mainIP\c$\Temp\cpuinfo.txt"
                     }
