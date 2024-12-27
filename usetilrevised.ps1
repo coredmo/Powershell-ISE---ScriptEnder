@@ -147,8 +147,8 @@ function Invoke-Config {
 
     # Recents & AD functionality
         #region
-    # Search the local active directory's computer descriptions
-function Scan-Create {
+    # Search the local active directory's computer descriptions (Magnum opus)
+function AD-Scan {
     while ($true) {
             # If $configFile exists, $adCheck will be determined by the status of AD-Capability Check. Otherwise default to $adCheck = $true
             # If RSAT Active Directory Tools are not installed, try installing and importing them, catching and ending if it fails
@@ -291,7 +291,7 @@ function Scan-Create {
     }
 }
 
-    # Open a recents list and select a host to be the primary computer
+    # Open a recents list and select a host to be the primary computer (Requires work, error handling in particular)
 function Invoke-Recents {
     if (-not $unitList) { Write-Host "The recents list is empty" }
         else {
@@ -428,10 +428,11 @@ function Get-IP {
     $global:getV4 = $null
     $global:getMAC = $null
     
-    $ipv4Result = nslookup $mainIP
-    $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
-    if ($nsResultV4.Count -lt 2) { "" } else { $global:getV4 = $nsResultV4[1]; $arpResult = arp -a | findstr "$getV4" }
-    if ($arpResult -match $macRegEx) { $global:getMAC = $matches[0] }
+    if ($ipv4Result = nslookup $mainIP) {
+        $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
+        if ($nsResultV4.Count -lt 2) { "" } else { $global:getV4 = $nsResultV4[1]; $arpResult = arp -a | findstr "$getV4" }
+        if ($arpResult -match $macRegEx) { $global:getMAC = $matches[0] }
+    }
 }
 
     # Send a magic packet to a MAC Address, UDP via port 7 (Hrm)
@@ -476,7 +477,15 @@ function Invoke-Explorer {
     if ($option -eq $false) { Clear-Host; continue } Clear-Host
 
     Write-Host "Testing connection..."
-    try { Test-Connection $mainIP -Count 1 -ErrorAction Stop; "`n"; $pingup = $true }
+    try { 
+        Test-Connection $mainIP -Count 1 -ErrorAction Stop
+        "`n"
+        $pingup = $true
+        $nsResult = nslookup $($mainIP)
+        $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
+        $resultV4 = [regex]::Matches($nsResult, $nsRegex)
+        $mainV4 = $resultV4.Value
+    }
     catch {
         Clear-Host
         $host.UI.RawUI.ForegroundColor = "Red"
@@ -485,8 +494,9 @@ function Invoke-Explorer {
     }
 
     if ($pingup) {
+        try {
         # Get all directories in the base directory
-        $userDirs = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory
+        $userDirs = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory -ErrorAction Stop
         
         # Find the most recently modified directory
         $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -497,12 +507,18 @@ function Invoke-Explorer {
         # Find the Active Directory account correlated with the directory name
         $user = Get-ADUser -Filter {sAMAccountName -eq $mostRecentDirName} -Properties DisplayName
         $fullName = $user.DisplayName
+        } catch {
+            Write-Host "Failed to find Users folder..."
+        }
     }
 
     Get-IP $mainIP
-    try { $result = Get-ADComputer -Identity "$mainIP" -Properties Description -ErrorAction Stop | Select-Object Name,Description } catch { if (-not $pingup) { continue } }
+    try { $result = Get-ADComputer -Identity "$mainIP" -Properties Description -ErrorAction Stop | Select-Object Name,Description
+        if (!$result.Description) { $noDescription = $true; $notAD = $true }
+    } catch { $noDescription = $true; $notAD = $true }
 
     do {
+        $clear = $true
         if ($qMode) { query session /server:"$mainIP" }
         if ($usersMode) {
             $users = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory
@@ -511,7 +527,9 @@ function Invoke-Explorer {
             }
         }
 
-        "`n"; $result.Name; $result.Description; "`nMost Recent User:`n$mostRecentDirName - $fullName`n"
+        if (!$notAD) { "`n"; $result.Name; $result.Description }
+        if ($pingup) { "`nMost Recent User:`n$mostRecentDirName - $fullName`n" } else { "Connection Failed..." }
+        if ($noDescription) { Write-Host "Failed to find description..." }
 
         $host.UI.RawUI.ForegroundColor = "Yellow"
         if ($getMAC) { $getMAC }
@@ -530,47 +548,61 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
         switch ($choice) {
 
                 # Open an explorer instance in the C: of the $mainIP
-            {$_ -in "f"} {
+            {$_ -in "f" -and $pingup} {
                 ii \\$mainIP\c$
             }
 
                 # Toggles user query mode
-            {$_ -in "q"} {
+            {$_ -in "q" -and $pingup} {
                 if ($qMode) { $qMode = $false } else { $qMode = $true }
             }
 
-            {$_ -in "u"} {
+            {$_ -in "u" -and $pingup} {
                 if ($usersMode) { $usersMode = $false } else { $usersMode = $true }
             }
 
-                # Used scripts and an HTTPS server to gather info from a host (Required C:\Temp\UsetilHTTP\server.js)
-            {$_ -in "b"} {
-                #if (-not (Test-CommandExists "node")) {
-                #    Write-Output "Node.js is not installed. Installing via winget..."
-                #    winget install nodejs
-                #} else { "NodeJS is installed" }
+            {$_ -in "b" -and $pingup} {
 
                 try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
                 if ($infoRequest) {
-                    $arg1 = "/c wmic /node:`"" + $mainIP +"`" process call create `"cmd.exe /c (if exist C:\Temp (cd C:\Temp) else (cd C:\ && mkdir C:\Temp && cd C:\Temp))"
-                    $arg2 = "&& echo ----- >> cpuinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> cpuinfo.txt "
-                    $arg3 = "&& echo ----- >> cpuinfo.txt && wmic bios get serialnumber >> cpuinfo.txt && echo ----- >> cpuinfo.txt "
-                    $arg4 = "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"IPv4 Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt `"" 
-                    #$arg5 = "&& curl -H \`"Content-Type: text/plain\`" --data-binary @cpuinfo.txt http://" + $compName + ":3000/upload && del cpuinfo.txt`"" # REMOVE THE `" ^^
-                    $args = $arg1 + $arg2 + $arg3 + $arg4# + $arg5
-                    #try { Start-Process "cmd.exe" -ArgumentList "/k node C:\Temp\UsetilHTTP\server.js" -ErrorAction Stop } catch { $_.ErrorCode; $disableWMIC = $true}
+                    $args = "/c wmic /node:`"" + $mainIP +"`" process call create `"cmd.exe /c (if exist C:\Temp (cd C:\Temp) else (cd C:\ && mkdir C:\Temp && cd C:\Temp)) "
+                    $args += "&& echo ----- Host Info >> cpuinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> cpuinfo.txt "
+                    $args += "&& echo ----- >> cpuinfo.txt && wmic bios get serialnumber >> cpuinfo.txt && echo ----- >> cpuinfo.txt "
+                    $args += "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"IPv4 Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt `"" 
+
                     if (-not $disableWMIC) { "Processing..."
                         Start-Process "cmd.exe" -ArgumentList $args
+                        $rawcpuInfo = wmic /node:"$mainIP" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
+                        $lines = $rawcpuInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+
+                        $header = $lines[0] -split "\s{2,}"
+                        $data = $lines[1..($lines.Length - 1)] -join "`n"
+                        
+                        $cpuInfo = $data | ForEach-Object {
+                            $values = $_ -split "\s{2,}"
+                            [PSCustomObject]@{
+                                MaxClockSpeed = $values[0]
+                                Name = $values[1]
+                                NumberOfCores = $values[2]
+                                NumberOfLogicalProcessors = $values[3]
+                            }
+                        }
+                        
+                        $formattedOutput = $cpuInfo | ForEach-Object {
+                            "Name: $($_.Name), Cores: $($_.NumberOfCores), Logical Processors: $($_.NumberOfLogicalProcessors), Max Clock Speed: $($_.MaxClockSpeed) MHz"
+                        }
+
+                        #Start-Process "cmd.exe" -ArgumentList $cpuInfo
                         Start-Sleep -Milliseconds 4000
-                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt"
-                        Start-Sleep -Milliseconds 1000
+                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt && echo $formattedOutput"
+                        Start-Sleep -Milliseconds 2000
                         Remove-Item -Path "\\$mainIP\c$\Temp\cpuinfo.txt"
                     }
                 } else { "Unable to contact host PC" }                
             }
 
                 # It's possible the execution policy on the machine is restricted. Change it (Then change it back)
-            {$_ -ieq "p"} {
+            {$_ -ieq "p" -and $pingup} {
                 Clear-Host
                 "`n"; Write-Host "Changing Set-ExecutionPolicy...`nPress Y to set it to Bypass`nPress N to set it to Restricted`nPress any other key or leave it blank to exit"
                 $policyChoice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
@@ -581,15 +613,45 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
                 else { Write-Host "No option selected" }
             }
 
+            {$_ -in "w"} {
+                # Function to retrieve installed software from a remote PC
+                function Get-InstalledSoftware {
+                    param (
+                        [string]$mainIP
+                    )
+                    
+                    # Retrieve installed software from the remote computer
+                    $installedSoftware = Get-WmiObject -Class Win32_Product -ComputerName $mainIP | Select-Object Name, Version
+                    
+                    return $installedSoftware
+                }
+                
+                # Prompt user for the remote PC name and search query
+                $searchQuery = Read-Host "Enter the search query to filter installed software"
+                
+                # Get the installed software
+                $installedSoftware = Get-InstalledSoftware -ComputerName $mainIP
+                
+                # Filter the software list based on the search query
+                $filteredSoftware = $installedSoftware | Where-Object { $_.Name -like "*$searchQuery*" }
+                
+                # Output the filtered results
+                if ($filteredSoftware) {
+                    Write-Host "Installed software matching '$searchQuery' on $mainIP"
+                    $filteredSoftware | Format-Table -AutoSize
+                } else {
+                    Write-Host "No software matching '$searchQuery' found on $computerName."
+                } $clear = $false
+            }
+
             {-not $choice} {
                 [System.Console]::Clear();
                 $host.UI.RawUI.ForegroundColor = "Red"
                 Write-Host "Error: Input cannot be blank or incorrect. Please enter a valid option."
                 $host.UI.RawUI.ForegroundColor = $orig_fg_color
             }
-        } Clear-Host
-
-        if ($disableWMIC) { "WMIC process call is disabled because server.js does not exist" }
+        }
+    if ($clear) { Clear-Host }
 
     } while ($eValues -notcontains $choice)
 
@@ -827,11 +889,19 @@ function OneDrive-Status {
     
     $userProfilePath = "$compName\C$\Users\$mostRecentDirName"
 
-    $tempPath = "OneDrive"
-    
-    $oneDriveDesktopPath = "$userProfilePath\$tempPath\Desktop"
-    $oneDriveDocumentsPath = "$userProfilePath\$tempPath\Documents"
-    $oneDrivePicturesPath = "$userProfilePath\$tempPath\Pictures"
+    $tempPath = "OneDrive - Albert A. Webb Associates"
+    $altPath = "OneDrive - Webb Municipal Finance"
+
+    $testPath = Join-Path -Path $userProfilePath -ChildPath $altPath
+    if (Test-Path -Path $testPath -PathType Container) {
+        $oneDriveDesktopPath = "$userProfilePath\$altPath\Desktop"
+        $oneDriveDocumentsPath = "$userProfilePath\$altPath\Documents"
+        $oneDrivePicturesPath = "$userProfilePath\$altPath\Pictures"
+    } else {
+        $oneDriveDesktopPath = "$userProfilePath\$tempPath\Desktop"
+        $oneDriveDocumentsPath = "$userProfilePath\$tempPath\Documents"
+        $oneDrivePicturesPath = "$userProfilePath\$tempPath\Pictures"
+    }
 
     function Check-OneDriveSync {
         param (
@@ -886,7 +956,7 @@ while ($true) {
 
         {$_ -in "help", "h"} { C; Help }
 
-        {$_ -in "ad", "search", "a"} { C; Scan-Create }
+        {$_ -in "ad", "search", "a"} { C; AD-Scan }
 
         {$_ -in "recents", "recent", "rec", "r"} { C; Invoke-Recents }
 
