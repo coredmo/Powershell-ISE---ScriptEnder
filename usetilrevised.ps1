@@ -572,9 +572,11 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
 
                     if (-not $disableWMIC) { "Processing..."
                         Start-Process "cmd.exe" -ArgumentList $args
-                        $rawcpuInfo = wmic /node:"$mainIP" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
-                        $lines = $rawcpuInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
 
+                        #region CPU Info
+                        $rawCPUInfo = wmic /node:`""$mainIP"`" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
+                        
+                        $lines = $rawCPUInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
                         $header = $lines[0] -split "\s{2,}"
                         $data = $lines[1..($lines.Length - 1)] -join "`n"
                         
@@ -587,16 +589,24 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
                                 NumberOfLogicalProcessors = $values[3]
                             }
                         }
-                        
-                        $formattedOutput = $cpuInfo | ForEach-Object {
+
+                        $formattedCPUOutput = $cpuInfo | ForEach-Object {
                             "Name: $($_.Name), Cores: $($_.NumberOfCores), Logical Processors: $($_.NumberOfLogicalProcessors), Max Clock Speed: $($_.MaxClockSpeed) MHz"
                         }
+                        #endregion
+
+                        #region GPU Info
+                        $rawGPUInfo = wmic /node:`""$mainIP"`" path Win32_VideoController get Name,DeviceID,AdapterRAM,DriverVersion,VideoProcessor,Status /format:list
+                        $gpulines = $rawGPUInfo -split "`n" | Select-Object -Skip 2 | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+                        $gpuFormatted += $gpulines | Where-Object { $_ -like "Name=*" -and  } | ForEach-Object { ($_ -replace "^Name=", "") + " -" }
+                        #endregion                       
 
                         #Start-Process "cmd.exe" -ArgumentList $cpuInfo
                         Start-Sleep -Milliseconds 4000
-                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt && echo $formattedOutput"
+                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt && echo $formattedCPUOutput && echo $gpuFormatted"
                         Start-Sleep -Milliseconds 2000
                         Remove-Item -Path "\\$mainIP\c$\Temp\cpuinfo.txt"
+                        $gpuFormatted = $null
                     }
                 } else { "Unable to contact host PC" }                
             }
