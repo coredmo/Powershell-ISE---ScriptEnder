@@ -598,7 +598,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
                         #region GPU Info
                         $rawGPUInfo = wmic /node:`""$mainIP"`" path Win32_VideoController get Name,DeviceID,AdapterRAM,DriverVersion,VideoProcessor,Status /format:list
                         $gpulines = $rawGPUInfo -split "`n" | Select-Object -Skip 2 | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
-                        $gpuFormatted += $gpulines | Where-Object { $_ -like "Name=*" -and  } | ForEach-Object { ($_ -replace "^Name=", "") + " -" }
+                        $gpuFormatted += $gpulines | Where-Object { $_ -like "Name=*" } | ForEach-Object { ($_ -replace "^Name=", "") + " -" }
                         #endregion                       
 
                         #Start-Process "cmd.exe" -ArgumentList $cpuInfo
