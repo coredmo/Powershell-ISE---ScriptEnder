@@ -3,9 +3,10 @@
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
 
+# Gets the current users name and strips its domain name
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
-$username = $parts[-1] # Gets the current users name and strips its domain name
+$username = $parts[-1]
 
 $folderPath = "C:\users\$username"
 $tempFile = "C:\Temp"
@@ -566,47 +567,125 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
                 try { $infoRequest = $true, "`n"; Test-Connection -ComputerName $mainIP -Count 1 -ErrorAction Stop } catch { $infoRequest = $false }
                 if ($infoRequest) {
                     $args = "/c wmic /node:`"" + $mainIP +"`" process call create `"cmd.exe /c (if exist C:\Temp (cd C:\Temp) else (cd C:\ && mkdir C:\Temp && cd C:\Temp)) "
-                    $args += "&& echo ----- Host Info >> cpuinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> cpuinfo.txt "
-                    $args += "&& echo ----- >> cpuinfo.txt && wmic bios get serialnumber >> cpuinfo.txt && echo ----- >> cpuinfo.txt "
-                    $args += "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"IPv4 Address\`" /C:\`"Description\`" >> cpuinfo.txt && echo ----- >> cpuinfo.txt `"" 
+                    $args += "&& echo ----- Host Info ----- >> hostinfo.txt && systeminfo | findstr /C:\`"Host Name\`" /C:\`"OS Name\`" /C:\`"BIOS Version\`" /C:\`"System Model\`" >> hostinfo.txt "
+                    $args += "&& echo ----- >> hostinfo.txt && wmic bios get serialnumber >> hostinfo.txt && echo ----- Network Info ----- >> hostinfo.txt "
+                    $args += "& ipconfig /all | findstr /C:\`"Ethernet adapter\`" /C:\`"Physical Address\`" /C:\`"IPv4 Address\`" /C:\`"Description\`" >> hostinfo.txt && echo ----- >> hostinfo.txt `"" 
 
                     if (-not $disableWMIC) { "Processing..."
                         Start-Process "cmd.exe" -ArgumentList $args
 
                         #region CPU Info
-                        $rawCPUInfo = wmic /node:`""$mainIP"`" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
-                        
-                        $lines = $rawCPUInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
-                        $header = $lines[0] -split "\s{2,}"
-                        $data = $lines[1..($lines.Length - 1)] -join "`n"
-                        
-                        $cpuInfo = $data | ForEach-Object {
-                            $values = $_ -split "\s{2,}"
-                            [PSCustomObject]@{
-                                MaxClockSpeed = $values[0]
-                                Name = $values[1]
-                                NumberOfCores = $values[2]
-                                NumberOfLogicalProcessors = $values[3]
+                        try {
+                            $rawCPUInfo = wmic /node:`""$mainIP"`" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
+                            
+                            $lines = $rawCPUInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+                            $header = $lines[0] -split "\s{2,}"
+                            $data = $lines[1..($lines.Length - 1)] -join "`n"
+                            
+                            $cpuInfo = $data | ForEach-Object {
+                                $values = $_ -split "\s{2,}"
+                                [PSCustomObject]@{
+                                    MaxClockSpeed = $values[0]
+                                    Name = $values[1]
+                                    NumberOfCores = $values[2]
+                                    NumberOfLogicalProcessors = $values[3]
+                                }
                             }
-                        }
 
-                        $formattedCPUOutput = $cpuInfo | ForEach-Object {
-                            "Name: $($_.Name), Cores: $($_.NumberOfCores), Logical Processors: $($_.NumberOfLogicalProcessors), Max Clock Speed: $($_.MaxClockSpeed) MHz"
-                        }
+                            $formattedCPUOutput = $cpuInfo | ForEach-Object {
+                                "Name: $($_.Name) - Cores: $($_.NumberOfCores) - Logical Processors: $($_.NumberOfLogicalProcessors) - Max Clock Speed: $($_.MaxClockSpeed) MHz"
+                            }
+                        } catch { $formattedCPUOutput = "No CPU data available..."; Write-Host "WMIC Failed or no CPU:`n$($_.Exception.Message)" }
                         #endregion
 
                         #region GPU Info
-                        $rawGPUInfo = wmic /node:`""$mainIP"`" path Win32_VideoController get Name,DeviceID,AdapterRAM,DriverVersion,VideoProcessor,Status /format:list
-                        $gpulines = $rawGPUInfo -split "`n" | Select-Object -Skip 2 | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
-                        $gpuFormatted += $gpulines | Where-Object { $_ -like "Name=*" } | ForEach-Object { ($_ -replace "^Name=", "") + " -" }
-                        #endregion                       
+                        try {
+                            $rawGPUInfo = wmic /node:`""$mainIP"`" path Win32_VideoController get Name,DeviceID,AdapterRAM,DriverVersion,VideoProcessor,Status /format:list
+                            $gpulines = $rawGPUInfo -split "`n" | Select-Object -Skip 2 | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+                            $gpuFormatted += $gpulines | Where-Object { $_ -like "Name=*" } | ForEach-Object { ($_ -replace "^Name=", "") + " -" }
+                        } catch { $gpuFormatted = "No GPU data available..."; Write-Host "WMIC Failed or no GPU:`n$($_.Exception.Message)" }
+                        #endregion
 
-                        #Start-Process "cmd.exe" -ArgumentList $cpuInfo
+                        #region Storage Info
+                        try {
+                            $rawDiskInfo = wmic /node:"$mainIP" path Win32_DiskDrive get "Index,Model,Size"
+                            $lines = $rawDiskInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+                            $header = $lines[0] -split "\s{2,}"
+                            if ($lines.Length -gt 1) {
+                                $data = $lines[1..($lines.Length - 1)]
+                            } else {
+                                $data = @()  # or skip processing
+                            }
+                            $diskInfo = $data | ForEach-Object {
+                                $values = $_ -split "\s{2,}"
+                                if ($values.Count -lt 3) { return }  # ignore malformed lines
+                                [PSCustomObject]@{
+                                    Index = $values[0]
+                                    Model = $values[1]
+                                    Size = $values[2]
+                                }
+                            }
+                            $formattedOutput = $diskInfo | ForEach-Object { "Index: $($_.Index) - Model: $($_.Model) - Size: $($_.Size)" }
+                            $formattedDiskOutput = $formattedOutput
+                        } catch { $formattedDiskOutput = "No Disk data available..."; Write-Host "WMIC Failed or no Disks:`n$($_.Exception.Message)" }
+
+                        try {
+                            $rawStorageInfo = wmic /node:"$mainIP" path Win32_LogicalDisk where "DriveType=3" get DeviceID,VolumeName,FileSystem,Size,FreeSpace
+                            $lines = $rawStorageInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+                            $header = $lines[0] -split "\s{2,}"
+                            $data = $lines[1..($lines.Length - 1)] -join "`n"
+                            $storageInfo = $data | ForEach-Object {
+                                $values = $_ -split "\s{2,}"
+                                [PSCustomObject]@{
+                                    DeviceID = $values[0]
+                                    VolumeName = $values[4]
+                                    FileSystem = $values[1]
+                                    Size = $values[3]
+                                    FreeSpace = $values[2]
+                                }
+                            }
+                            $formattedOutput = $storageInfo | ForEach-Object { "DeviceID: $($_.DeviceID) - VolumeName: $($_.VolumeName) - FileSystem: $($_.FileSystem) - Size: $($_.Size) - FreeSpace: $($_.FreeSpace)" }
+                            $formattedStorageOutput = $formattedOutput
+                        } catch { $formattedStorageOutput = "No Storage data available..."; Write-Host "WMIC Failed or no Storage:`n$($_.Exception.Message)" }
+
+                        try {
+                            $rawRemovableInfo = wmic /node:"$mainIP" path Win32_LogicalDisk where "DriveType=2" get DeviceID,VolumeName,FileSystem,Size,FreeSpace
+                            $lines = $rawRemovableInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+                            $header = $lines[0] -split "\s{2,}"
+                            $data = $lines[1..($lines.Length - 1)] -join "`n"
+                            $remDiskInfo = $data | ForEach-Object {
+                                $values = $_ -split "\s{2,}"
+                                 [PSCustomObject]@{
+                                    DeviceID = $values[0]
+                                    VolumeName = $values[4]
+                                    FileSystem = $values[1]
+                                    Size = $values[3]
+                                    FreeSpace = $values[2]
+                                }
+                            }
+                            $formattedOutput = $remDiskInfo | ForEach-Object { "DeviceID: $($_.DeviceID) - VolumeName: $($_.VolumeName) - FileSystem: $($_.FileSystem) - Size: $($_.Size) - FreeSpace: $($_.FreeSpace)" }
+                            $formattedRemDiskOutput = $formattedOutput
+                        } catch { $formattedRemDiskOutput = "No Removable Disk data available..."; Write-Host "WMIC Failed or no Removable Drives:`n$($_.Exception.Message)" }
+
+                        $fullOutputFile = "\\$mainIP\c$\Temp\fullstorageinfo.txt"
+                        @(
+                            "----- Storage -----"
+                            $formattedDiskOutput
+                            $formattedStorageOutput
+                            $formattedRemDiskOutput
+                        ) | Set-Content -Path $fullOutputFile -Encoding ASCII
+                        #endregion
+
                         Start-Sleep -Milliseconds 4000
-                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\cpuinfo.txt && echo $formattedCPUOutput && echo $gpuFormatted"
+                        Start-Process cmd.exe -ArgumentList "/k type \\$mainIP\c$\Temp\hostinfo.txt && echo $formattedCPUOutput && echo ----- && echo $gpuFormatted && type `"$fullOutputFile`""
                         Start-Sleep -Milliseconds 2000
-                        Remove-Item -Path "\\$mainIP\c$\Temp\cpuinfo.txt"
+                        Remove-Item -Path "\\$mainIP\c$\Temp\hostinfo.txt"
+
+                        $formattedCPUOutput = $null
                         $gpuFormatted = $null
+                        $formattedDiskOutput = $null
+                        $formattedStorageOutput = $null
+                        $formattedRemDiskOutput = $null
                     }
                 } else { "Unable to contact host PC" }                
             }
