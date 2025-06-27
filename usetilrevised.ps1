@@ -46,6 +46,9 @@ search   |   ad  |  a: Search your active directory's computer descriptions and 
 recent/s |  rec  |  r: Open a recents list and select a host to be the primary computer
 file     | stat  |  f: Session check, open network file explorer, Set-ExecutionPolicy, or gather info
 
+Requires Powershell 7 (4/29/2025):
+serial   |         ss: Parallel ping/wmic an entire subnet in search of a PC with a corresponding serial number
+
 Often times Y = "e" and N = "q"
 
 - Connor's Scripted Toolkit (ISE Iteration 2 (Not an ISE))-
@@ -153,7 +156,6 @@ function AD-Scan {
     while ($true) {
             # If $configFile exists, $adCheck will be determined by the status of AD-Capability Check. Otherwise default to $adCheck = $true
             # If RSAT Active Directory Tools are not installed, try installing and importing them, catching and ending if it fails
-            # It will Import-Module if it is or has been installed, skipping this check next time
         $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Checking RSAT AD Tools status..."; $host.UI.RawUI.ForegroundColor = $orig_fg_color
         if (-not (Test-Path $configFile)) { $adCheck = $true } else { $checkStat = $true }
         if ($checkStat) { if ((Check-Status -settingName "AD-Capability Check") -contains "True") { $adCheck = $true }}
@@ -421,6 +423,74 @@ function Group-Policy {
 
     # Parameter included Utilities
         #region
+    # Parallel ping/wmic an entire subnet in search of a PC with a corresponding serial number
+function Serial-Search {
+    if ($parameter) {
+        Write-Host "Target serial number is: $parameter"
+        $TargetSerial = $parameter
+    } else {
+        $TargetSerial = Read-Host "Enter the serial number (leave blank to return to console):"
+    }
+    if (!$TargetSerial) { return }
+
+    while ($true) {
+        $subnet = Read-Host "(RSAT Required): Enter 'querylist' to view all subnets`nEnter the subnet (Default 192.168.2):"
+        if (!$subnet) {
+            $subnet = "192.168.2"
+            break
+        } elseif ($subnet -eq "querylist") {
+            Get-ADReplicationSubnet -Filter * | Select-Object Name, Site, Location
+        } else {
+            break
+        }
+    }
+
+    Write-Host "🔍 Scanning for live computers..."
+    $liveIPs = 1..254 | ForEach-Object -Parallel {
+        $IP = "$using:subnet.$_"
+        if (Test-Connection -ComputerName $IP -Count 1 -Quiet -ErrorAction SilentlyContinue) {
+            $IP
+        }
+    } -ThrottleLimit 50
+
+    $liveIPs = $liveIPs | Where-Object { $_ } | Sort-Object -Unique
+    $liveIPs | ForEach-Object { Write-Host "➡️ $_" }
+
+    Write-Host "✅ Found $($liveIPs.Count) alive computers."
+    Write-Host "🔍 Scanning for matching serial number..."
+
+    $matches = @()
+    foreach ($ip in $liveIPs) {
+        try {
+            $bios = Get-WmiObject -Class Win32_BIOS -ComputerName $ip -ErrorAction Stop
+            $remoteSerial = ($bios.SerialNumber -replace '[^\x20-\x7E]', '').Trim()
+            if ($remoteSerial -ieq $TargetSerial.Trim()) {
+                $matches += [PSCustomObject]@{
+                    Computer = $ip
+                    Serial   = $remoteSerial
+                }
+            }
+        } catch {
+            Write-Host "⚠️ WMI failed on $ip" -ForegroundColor DarkGray
+        }
+    }
+
+    if ($matches.Count -gt 0) {
+        foreach ($m in $matches) {
+            Write-Host "✅ Match found on $($m.Computer): $($m.Serial)"
+
+            $dnsInfo = nslookup $m.Computer | Where-Object { $_ -match '^Name:|^Address:' }
+            $startIndex = ($dnsInfo | Select-String '^Name:' | Select-Object -First 1).LineNumber - 1
+            $dnsInfo = $dnsInfo[$startIndex..($dnsInfo.Count - 1)]
+            
+            $dnsInfo | ForEach-Object { Write-Host "🔎 $_" }
+            
+        }
+    } else {
+        Write-Host "❌ Serial number NOT found on any device."
+    }
+}
+
     # Use nslookup and arp, then cache the computer's IP and MAC 
 function Get-IP {
     param (
@@ -558,6 +628,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
                 if ($qMode) { $qMode = $false } else { $qMode = $true }
             }
 
+                #Toggles user folder mode
             {$_ -in "u" -and $pingup} {
                 if ($usersMode) { $usersMode = $false } else { $usersMode = $true }
             }
@@ -576,7 +647,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
 
                         #region CPU Info
                         try {
-                            $rawCPUInfo = wmic /node:`""$mainIP"`" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
+                            $rawCPUInfo = wmic /node:"$mainIP" cpu get name,numberofcores,numberoflogicalprocessors,maxclockspeed
                             
                             $lines = $rawCPUInfo -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
                             $header = $lines[0] -split "\s{2,}"
@@ -600,7 +671,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
 
                         #region GPU Info
                         try {
-                            $rawGPUInfo = wmic /node:`""$mainIP"`" path Win32_VideoController get Name,DeviceID,AdapterRAM,DriverVersion,VideoProcessor,Status /format:list
+                            $rawGPUInfo = wmic /node:"$mainIP" path Win32_VideoController get Name,DeviceID,AdapterRAM,DriverVersion,VideoProcessor,Status /format:list
                             $gpulines = $rawGPUInfo -split "`n" | Select-Object -Skip 2 | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
                             $gpuFormatted += $gpulines | Where-Object { $_ -like "Name=*" } | ForEach-Object { ($_ -replace "^Name=", "") + " -" }
                         } catch { $gpuFormatted = "No GPU data available..."; Write-Host "WMIC Failed or no GPU:`n$($_.Exception.Message)" }
@@ -952,7 +1023,8 @@ function Ping-Interface {
     }
     $prePing = $null
 }
-
+    
+    # Check if a user on a remote PC has their OneDrive backing their files up
 function OneDrive-Status {
     if (!$parameter -and !$recentMode) {
         $hostname = Read-Host "Enter the device name"
@@ -1040,8 +1112,7 @@ while ($true) {
     
     switch ($choice) { 
 
-        #{$_ -in "pw"} { C; 
-            #Start-Process powershell.exe "& '@'" -WorkingDirectory $folderPath }
+       #{$_ -in "pw"} { C; Start-Process powershell.exe "& '@'" -WorkingDirectory $folderPath }
 
         {$_ -in "help", "h"} { C; Help }
 
@@ -1054,6 +1125,8 @@ while ($true) {
         {$_ -in "wake","wol","w"} { C; Invoke-WOL }
 
         {$_ -in "gpupdate","gp"} { C; Group-Policy }
+
+        {$_ -in "serial","ss"} {C; Serial-Search }
 
         {$_ -in "terminal","term","t"} { C; Terminal }
 
