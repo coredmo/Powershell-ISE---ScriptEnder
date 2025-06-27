@@ -17,10 +17,6 @@ $orig_fg_color = $host.UI.RawUI.ForegroundColor
 $compName = $env:COMPUTERNAME
 Set-Location $env:USERPROFILE
 
-# Get the IPv4 address of the first enabled Ethernet or Wi-Fi adapter
-$IPgrabbing = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*', 'Wi-Fi*' -PrefixOrigin Dhcp | Select-Object -First 1).IPAddress
-$localIP = $IPgrabbing.ToString()
-
     # Ignores error handling
 function C { $global:correct = $true }
 
@@ -63,7 +59,7 @@ $noid = Read-Host -Debug; Clear-Host
 if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($noid -ieq " ") { Write-Host "dingus" }
 }
 
-    # Config reading & functionality
+    # Config reading & functionality + Misc util
         #region
     # Function to check if a command exists
 function Test-CommandExists {
@@ -145,6 +141,21 @@ function Invoke-Config {
             elseif ($choice -ieq "s") { Toggle-Setting -settingName "AD-Capability Check" }
             Clear-Host
         } while ($choice -notcontains 'e')
+    }
+}
+
+    # Use nslookup and arp, then cache the computer's IP and MAC 
+function Get-IP {
+    param (
+        [string]$mainIP
+    )
+    $global:getV4 = $null
+    $global:getMAC = $null
+    
+    if ($ipv4Result = nslookup $mainIP) {
+        $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
+        if ($nsResultV4.Count -lt 2) { "" } else { $global:getV4 = $nsResultV4[1]; $arpResult = arp -a | findstr "$getV4" }
+        if ($arpResult -match $macRegEx) { $global:getMAC = $matches[0] }
     }
 }
         #endregion
@@ -395,6 +406,9 @@ function Terminal {
     # Run a simple forced group policy update or display the RSoP summary data
 function Group-Policy {
     while ($true) {
+        if ($parameter) { $device = $parameter } else { $device = Read-Host "Enter the destination host or leave it blank to return to command line" if (!$device) { return }}
+        
+        Read-Host "$parameter -- $device"
         $ganswers = @("u","r","e","q")
         while ($true) {
             Write-Host "U / E - Run a forced group policy update | R / Q - Displays RSoP summary data`n- Leave it blank to return to command line"
@@ -418,6 +432,26 @@ function Group-Policy {
         [System.Console]::ReadKey().Key
         Clear-Host
     }
+}
+
+    #Grab local IPv4
+function Get-Local-Address {
+    $global:localIP = $null
+    
+    $IPgrabbing = Get-NetIPConfiguration |
+        Where-Object {
+            $_.IPv4Address -and
+            $_.NetAdapter.Status -eq 'Up' -and
+            ($_.NetAdapter.InterfaceDescription -match 'Ethernet|Wi-Fi')
+        } |
+        Select-Object -ExpandProperty IPv4Address |
+        Select-Object -ExpandProperty IPAddress -First 1
+
+    if ($IPgrabbing) {
+        $global:localIP = $IPgrabbing
+    } else {
+        Write-Host "Local IP unavailable..."; $localIP = "Unavailable"
+    } #$IPgrabbing = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*', 'Wi-Fi*' -PrefixOrigin Dhcp | Select-Object -First 1).IPAddress
 }
     #endregion
 
@@ -488,21 +522,6 @@ function Serial-Search {
         }
     } else {
         Write-Host "❌ Serial number NOT found on any device."
-    }
-}
-
-    # Use nslookup and arp, then cache the computer's IP and MAC 
-function Get-IP {
-    param (
-        [string]$mainIP
-    )
-    $global:getV4 = $null
-    $global:getMAC = $null
-    
-    if ($ipv4Result = nslookup $mainIP) {
-        $nsResultV4 = [regex]::Matches($ipv4Result, $ipv4RegEx) | ForEach-Object { $_.Value }
-        if ($nsResultV4.Count -lt 2) { "" } else { $global:getV4 = $nsResultV4[1]; $arpResult = arp -a | findstr "$getV4" }
-        if ($arpResult -match $macRegEx) { $global:getMAC = $matches[0] }
     }
 }
 
@@ -1141,6 +1160,8 @@ while ($true) {
         {$_ -in "config","c"} { C; Invoke-Config }
 
         {$_ -in "exprs","rs"} { C; Explorer-RS }
+
+        {$_ -in "q"} { C; Get-Local-Address; Write-Host "Local IPv4: $localIP" }
 
     }
 
