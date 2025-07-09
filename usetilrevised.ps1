@@ -3,7 +3,6 @@
 $ipv4RegEx = '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
 $macRegEx = '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}'
 
-# Gets the current users name and strips its domain name
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $parts = $currentUser -split '\\'
 $username = $parts[-1]
@@ -162,15 +161,15 @@ function Get-IP {
 
     # Recents & AD functionality
         #region
-    # Search the local active directory's computer descriptions (Magnum opus)
+    # Search the local active directory's computer descriptions (Needs redo)
 function AD-Scan {
     while ($true) {
             # If $configFile exists, $adCheck will be determined by the status of AD-Capability Check. Otherwise default to $adCheck = $true
             # If RSAT Active Directory Tools are not installed, try installing and importing them, catching and ending if it fails
         $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Checking RSAT AD Tools status..."; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            # If the configfile exists, check its AD-Capability Check status and then run the ADCheck if so
         if (-not (Test-Path $configFile)) { $adCheck = $true } else { $checkStat = $true }
         if ($checkStat) { if ((Check-Status -settingName "AD-Capability Check") -contains "True") { $adCheck = $true }}
-        if (-not $skipNext) {
             if ($adCheck) {
                 $capability = Get-Module -ListAvailable | Where-Object {$_.Name -eq 'ActiveDirectory'}
                 if ($capability.Name -notcontains "ActiveDirectory") {
@@ -185,9 +184,8 @@ function AD-Scan {
                         $error = $true; $errorInfo = $_.Exception; break }
                 } else { Import-Module ActiveDirectory; $global:skipNext = $true }
             }
-        } Clear-Host
+        Clear-Host
 
-            # Get the domain controller IP and cache it globally
         $global:dcIP = (Resolve-DnsName -Name (Get-ADDomainController).HostName | Select-Object -ExpandProperty IPAddress).ToString()
 
             # Select Ping Mode
@@ -244,7 +242,7 @@ function AD-Scan {
                     $cancelResult = $true
                 } if ($cancelResult) { break }
                 
-                    # Use nslookup to grab the computer's IP (I should update this to a function)
+                    # Use nslookup to grab the computer's IP (I should update this to a function (I need to go back and review this whole function))
                 Write-Host " - $($computer.Name), $($computer.Description)"
                 $nsResult = nslookup $($computer.Name)
                 $nsRegex = "(?:\d{1,3}\.){3}\d{1,3}(?!.*(?:\d{1,3}\.){3}\d{1,3})"
@@ -585,16 +583,12 @@ function Invoke-Explorer {
 
     if ($pingup) {
         try {
-        # Get all directories in the base directory
         $userDirs = Get-ChildItem -Path "\\$mainIP\c$\Users" -Directory -ErrorAction Stop
         
-        # Find the most recently modified directory
         $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         
-        # Extract the name of the most recently modified directory
         $mostRecentDirName = $mostRecentDir.Name
 
-        # Find the Active Directory account correlated with the directory name
         $user = Get-ADUser -Filter {sAMAccountName -eq $mostRecentDirName} -Properties DisplayName
         $fullName = $user.DisplayName
         } catch {
@@ -1060,28 +1054,26 @@ function OneDrive-Status {
         try { $userDirs = Get-ChildItem -Path "$compName\C$\Users" -Directory -ErrorAction Stop }
         catch { Clear-Host; Write-Output "An error occurred: $($_.Exception.Message)"; break }
         
-        # Find the most recently modified directory
         $mostRecentDir = $userDirs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         
-        # Extract the name of the most recently modified directory
         $mostRecentDirName = $mostRecentDir.Name
     }
     
     $userProfilePath = "$compName\C$\Users\$mostRecentDirName"
 
-    $tempPath = "OneDrive - Albert A. Webb Associates"
-    $altPath = "OneDrive - Webb Municipal Finance"
+    try {
+        $userOneDrivePaths = Get-ChildItem -Path $userProfilePath -Directory -ErrorAction Stop | Where-Object { $_.Name -like "*OneDrive*" } | Select-Object -ExpandProperty FullName
+        if (-not $userOneDrivePaths) {
+            Write-Host "No OneDrive folders found in $userProfilePath"; break
+        }
 
-    $testPath = Join-Path -Path $userProfilePath -ChildPath $altPath
-    if (Test-Path -Path $testPath -PathType Container) {
-        $oneDriveDesktopPath = "$userProfilePath\$altPath\Desktop"
-        $oneDriveDocumentsPath = "$userProfilePath\$altPath\Documents"
-        $oneDrivePicturesPath = "$userProfilePath\$altPath\Pictures"
-    } else {
-        $oneDriveDesktopPath = "$userProfilePath\$tempPath\Desktop"
-        $oneDriveDocumentsPath = "$userProfilePath\$tempPath\Documents"
-        $oneDrivePicturesPath = "$userProfilePath\$tempPath\Pictures"
+        foreach ($onedrivePath in $userOneDrivePaths) {
+            $oneDriveDesktopPath = "$onedrivePath\Desktop"
+            $oneDriveDocumentsPath = "$onedrivePath\Documents"
+            $oneDrivePicturesPath = "$onedrivePath\Pictures"
+        }
     }
+    catch { Clear-Host; Write-Output "An error occurred: $($_.Exception.Message)"; break }
 
     function Check-OneDriveSync {
         param (
@@ -1101,7 +1093,6 @@ function OneDrive-Status {
     Check-OneDriveSync -folderPath $oneDriveDocumentsPath
     Check-OneDriveSync -folderPath $oneDrivePicturesPath
     
-    #Clear-Host
     "$compFit - $mostRecentDirName`n",$ODresultList,"$ODconfirmation","---`n"
     $global:ODresultList,$global:ODconfirmation = $null
     }
@@ -1109,69 +1100,64 @@ function OneDrive-Status {
 
     # Command Loop
 while ($true) {
-    $correct = $false
     $parameter = $null
 
-    # Read a command from a user and split it if they add extra parameters
     Write-Host "`nType a command or 'help' for a list of commands"
     if ($recentMode) { 
         $host.UI.RawUI.ForegroundColor = "Yellow"
-        Write-Host " - Selected Host: $selectedName - Enter 'e' to disable"; " - " + $selectedResult.Description 
+        Write-Host " - Selected Host: $selectedName - Enter 'e' to disable"
+        Write-Host " - $($selectedResult.Description)"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
     }
 
-    $choice = Read-Host ">"; $choice = $choice.Trim()
+    $inputLine = Read-Host ">"
+    $inputLine = $inputLine.Trim()
     [System.Console]::Clear()
-    if ($choice -ieq "a command") { C; ":D"; continue }
-    
-        # This will be rendered worthless now that I know I can toss a parameter to a function (I'll do that in usetil iteration 4)
-    $tokens = $choice -split '\s+', 2
-    $choice = $tokens[0]
-    $parameter = $tokens[1]
-    
-    switch ($choice) { 
+    if ($inputLine -ieq "a command") { ":D"; continue }
 
-       #{$_ -in "pw"} { C; Start-Process powershell.exe "& '@'" -WorkingDirectory $folderPath }
+    # Split into command and parameter
+    $tokens = $inputLine -split '\s+', 2
+    $command = $tokens[0]
+    if ($tokens.Count -gt 1) { $parameter = $tokens[1] }
 
-        {$_ -in "help", "h"} { C; Help }
+    switch -Regex ($command.ToLower()) {
 
-        {$_ -in "ad", "search", "a"} { C; AD-Scan }
+        "^help|^h$"           { Clear-Host; Help; continue }
+        "^ad|^search|^a$"     { Clear-Host; AD-Scan; continue }
+        "^rec|^recent|^r$"    { Clear-Host; Invoke-Recents; continue }
+        "^ping|^p$"           { Clear-Host; Ping-Interface; continue }
+        "^wake|^wol|^w$"      { Clear-Host; Invoke-WOL; continue }
+        "^gpupdate|^gp$"      { Clear-Host; Group-Policy; continue }
+        "^serial|^ss$"        { Clear-Host; Serial-Search; continue }
+        "^terminal|^term|^t$" { Clear-Host; Terminal; continue }
+        "^shutdown|^shut|^s$" { Clear-Host; Invoke-Shutdown; continue }
+        "^file|^stat|^f$"     { Clear-Host; Invoke-Explorer; continue }
+        "^onedrive|^od|^o$"   { Clear-Host; OneDrive-Status; continue }
+        "^config|^c$"         { Clear-Host; Invoke-Config; continue }
+        "^exprs|^rs$"         { Clear-Host; Explorer-RS; continue }
+        "^q$"                 { 
+            Clear-Host
+            Get-Local-Address
+            Write-Host "Local IPv4: $localIP"
+            continue 
+        }
+        "^e$|^d$" {
+            if ($recentMode) { 
+                $recentMode = $false
+                Write-Host "Disabled Recent Mode"
+            }
+            continue
+        }
+        "^exit|^quit|^x$" { 
+            Write-Host "Exiting..."
+            break
+        }
 
-        {$_ -in "recents", "recent", "rec", "r"} { C; Invoke-Recents }
-
-        {$_ -in "ping","p"} { C; Ping-Interface }
-
-        {$_ -in "wake","wol","w"} { C; Invoke-WOL }
-
-        {$_ -in "gpupdate","gp"} { C; Group-Policy }
-
-        {$_ -in "serial","ss"} {C; Serial-Search }
-
-        {$_ -in "terminal","term","t"} { C; Terminal }
-
-        {$_ -in "shutdown","shut","s"} { C; Invoke-Shutdown }
-
-        {$_ -in "file","stat","f"} { C; Invoke-Explorer }
-
-        {$_ -in "onedrive","od","o"} { C; OneDrive-Status }
-
-        {$_ -in "e", "d"} { C; if ($recentMode) { $recentMode = $false; "Disabled Recent Mode" } }
-
-        {$_ -in "config","c"} { C; Invoke-Config }
-
-        {$_ -in "exprs","rs"} { C; Explorer-RS }
-
-        {$_ -in "q"} { C; Get-Local-Address; Write-Host "Local IPv4: $localIP" }
-
-    }
-
-    if ($correct) {
-        if ($clear) { $clear = $false; Clear-Host }
-        continue
-    } else {
-        Clear-Host
-        $host.UI.RawUI.ForegroundColor = "Red"
-        Write-Host "Please input an actual command or follow the latter half of these here instructions"
-        $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        default {
+            $host.UI.RawUI.ForegroundColor = "Red"
+            Write-Host "Unrecognized command: '$command'"
+            Write-Host "Type 'help' for a list of commands"
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
+        }
     }
 }
