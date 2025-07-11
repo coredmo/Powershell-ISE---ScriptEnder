@@ -1150,7 +1150,7 @@ while ($true) {
         }
         "^exit|^quit|^x$" { 
             Write-Host "Exiting..."
-            break
+            [System.Environment]::Exit(0)
         }
 
         default {
