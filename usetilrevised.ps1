@@ -42,7 +42,7 @@ recent/s |  rec  |  r: Open a recents list and select a host to be the primary c
 file     | stat  |  f: Session check, open network file explorer, Set-ExecutionPolicy, or gather info
 
 Requires Powershell 7 (4/29/2025):
-serial   |         ss: Parallel ping/wmic an entire subnet in search of a PC with a corresponding serial number
+serial   |         ss: (RSAT) Parallel ping/wmic an entire subnet in search of a PC with a corresponding serial number
 
 Often times Y = "e" and N = "q"
 
@@ -368,7 +368,7 @@ function Invoke-Recents {
 
     # Tools & Utilities
         #region
-    # Start-Process cmd.exe or powershell.exe
+    # Start-Process cmd.exe or powershell.exe (Needs complete redo for powershell 7, its also really bad)
 function Terminal {
     $tanswers = @("y","n","e","q")
     while ($true) {
@@ -401,9 +401,10 @@ function Terminal {
     Clear-Host
 }
 
-    # Run a simple forced group policy update or display the RSoP summary data
+    # Run a simple forced group policy update or display the RSoP summary data (Edit to make it remote and capture remote rsop data)
 function Group-Policy {
-    while ($true) {
+    # Keeping this here temporarily while I figure out wether or not I want to keep it or improve it (This whole function I mean)
+    while ($no_use_skip_variable) {
         if ($parameter) { $device = $parameter } else { $device = Read-Host "Enter the destination host or leave it blank to return to command line" if (!$device) { return }}
         
         Read-Host "$parameter -- $device"
@@ -430,6 +431,8 @@ function Group-Policy {
         [System.Console]::ReadKey().Key
         Clear-Host
     }
+    if ($parameter) { Write-Host "Sending gpupdate call to $parameter..."; wmic /node:"$parameter" process call create "powershell.exe gpupdate /Force" }
+    else { Write-Host "Running Group Policy Update"; gpupdate /Force }
 }
 
     #Grab local IPv4
@@ -465,17 +468,26 @@ function Serial-Search {
     }
     if (!$TargetSerial) { return }
 
-    while ($true) {
-        $subnet = Read-Host "(RSAT Required): Enter 'querylist' to view all subnets`nEnter the subnet (Default 192.168.2):"
-        if (!$subnet) {
-            $subnet = "192.168.2"
-            break
-        } elseif ($subnet -eq "querylist") {
-            Get-ADReplicationSubnet -Filter * | Select-Object Name, Site, Location
-        } else {
-            break
+    do {
+        $prompt = "(RSAT Required): Enter 'querylist' to view all subnets`nEnter the subnet (Default 192.168.2):"
+        $subnet = Read-Host $prompt
+    
+        if ($subnet -eq 'querylist') {
+            Get-ADReplicationSubnet -Filter * | Select-Object Name, Site, Location | Out-Host
+            continue
+        }
+    
+        if (-not $subnet) {
+            $subnet = '192.168.2'
+        }
+    
+        # Must match xxx.xxx.xxx pattern
+        $isValid = $subnet -match '^\d{1,3}(\.\d{1,3}){2}$'
+        if (-not $isValid) {
+            Write-Warning "‘$subnet’ isn’t a valid /24 subnet prefix. Try again."
         }
     }
+    until ($isValid)
 
     Write-Host "🔍 Scanning for live computers..."
     $liveIPs = 1..254 | ForEach-Object -Parallel {
@@ -494,16 +506,21 @@ function Serial-Search {
     $matches = @()
     foreach ($ip in $liveIPs) {
         try {
-            $bios = Get-WmiObject -Class Win32_BIOS -ComputerName $ip -ErrorAction Stop
+            #$resolvedName = [System.Net.Dns]::GetHostEntry($ip).HostName
+            $adComputer = Get-ADComputer -Filter { IPv4Address -eq $ip }
+            $resolvedName = $adComputer.Name
+            $bios = Get-WmiObject -Class Win32_BIOS -ComputerName $resolvedName -ErrorAction Stop
+
             $remoteSerial = ($bios.SerialNumber -replace '[^\x20-\x7E]', '').Trim()
-            if ($remoteSerial -ieq $TargetSerial.Trim()) {
-                $matches += [PSCustomObject]@{
-                    Computer = $ip
-                    Serial   = $remoteSerial
-                }
-            }
-        } catch {
-            Write-Host "⚠️ WMI failed on $ip" -ForegroundColor DarkGray
+             if ($remoteSerial -ieq $TargetSerial.Trim()) {
+                 $matches += [PSCustomObject]@{
+                     Computer = $ip
+                     Serial   = $remoteSerial
+                 }
+             }
+        }
+        catch {
+            Write-Host "⚠️ WMI failed on $ip ($resolvedName)" -ForegroundColor DarkGray
         }
     }
 
@@ -1115,7 +1132,6 @@ while ($true) {
     [System.Console]::Clear()
     if ($inputLine -ieq "a command") { ":D"; continue }
 
-    # Split into command and parameter
     $tokens = $inputLine -split '\s+', 2
     $command = $tokens[0]
     if ($tokens.Count -gt 1) { $parameter = $tokens[1] }
