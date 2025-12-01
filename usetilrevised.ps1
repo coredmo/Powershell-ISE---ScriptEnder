@@ -501,44 +501,50 @@ function Serial-Search {
     $liveIPs | ForEach-Object { Write-Host "➡️ $_" }
 
     Write-Host "✅ Found $($liveIPs.Count) alive computers."
+
+    $TargetSerial = $TargetSerial.Trim()    
     Write-Host "🔍 Scanning for matching serial number..."
-
-    $matches = @()
-    foreach ($ip in $liveIPs) {
+    
+    $matches = $liveIPs | ForEach-Object -Parallel {
+        $ip = $_
+    
+        $targetSerial = $using:TargetSerial
+    
         try {
-            #$resolvedName = [System.Net.Dns]::GetHostEntry($ip).HostName
-            $adComputer = Get-ADComputer -Filter { IPv4Address -eq $ip }
-            $resolvedName = $adComputer.Name
-            $bios = Get-WmiObject -Class Win32_BIOS -ComputerName $resolvedName -ErrorAction Stop
-
+            $bios = Get-WmiObject -Class Win32_BIOS -ComputerName $ip -ErrorAction Stop
+    
             $remoteSerial = ($bios.SerialNumber -replace '[^\x20-\x7E]', '').Trim()
-             if ($remoteSerial -ieq $TargetSerial.Trim()) {
-                 $matches += [PSCustomObject]@{
-                     Computer = $ip
-                     Serial   = $remoteSerial
-                 }
-             }
+    
+            if ($remoteSerial -ieq $targetSerial) {
+                [PSCustomObject]@{
+                    Computer = $ip
+                    Serial   = $remoteSerial
+                }
+            }
         }
         catch {
-            Write-Host "⚠️ WMI failed on $ip ($resolvedName)" -ForegroundColor DarkGray
+            Write-Host "⚠️ WMI failed on $ip" -ForegroundColor DarkGray
+        }
+    
+    } -ThrottleLimit 20 |
+        Where-Object { $_ } |
+        Sort-Object Computer
+    
+        if ($matches.Count -gt 0) {
+            foreach ($m in $matches) {
+                Write-Host "✅ Match found on $($m.Computer): $($m.Serial)"
+    
+                $dnsInfo = nslookup $m.Computer | Where-Object { $_ -match '^Name:|^Address:' }
+                $startIndex = ($dnsInfo | Select-String '^Name:' | Select-Object -First 1).LineNumber - 1
+                $dnsInfo = $dnsInfo[$startIndex..($dnsInfo.Count - 1)]
+    
+                $dnsInfo | ForEach-Object { Write-Host "🔎 $_" }
+                
+            }
+        } else {
+            Write-Host "❌ Serial number NOT found on any device."
         }
     }
-
-    if ($matches.Count -gt 0) {
-        foreach ($m in $matches) {
-            Write-Host "✅ Match found on $($m.Computer): $($m.Serial)"
-
-            $dnsInfo = nslookup $m.Computer | Where-Object { $_ -match '^Name:|^Address:' }
-            $startIndex = ($dnsInfo | Select-String '^Name:' | Select-Object -First 1).LineNumber - 1
-            $dnsInfo = $dnsInfo[$startIndex..($dnsInfo.Count - 1)]
-            
-            $dnsInfo | ForEach-Object { Write-Host "🔎 $_" }
-            
-        }
-    } else {
-        Write-Host "❌ Serial number NOT found on any device."
-    }
-}
 
     # Send a magic packet to a MAC Address, UDP via port 7 (Hrm)
 function Invoke-WOL {
@@ -577,8 +583,10 @@ function Invoke-Explorer {
             do {
                 Clear-Host; $mainIP = Read-Host "- Status and File Explorer - Enter an IP or leave it blank to return to command-line -`n>"
                 if (-not $mainIP) { $option = $false }
-            } while (-not $mainIP -and $option) } else { $mainIP = $selectedName }
-        } else { $mainIP = $parameter }
+            } while (-not $mainIP -and $option)
+        } else { $mainIP = $selectedName }
+    } else { $mainIP = $parameter }
+
     if ($option -eq $false) { Clear-Host; continue } Clear-Host
 
     Write-Host "Testing connection..."
@@ -699,7 +707,7 @@ F - Open the host in file explorer`nQ - Query sessions on the host`nU - List use
                         } catch { $formattedCPUOutput = "No CPU data available..."; Write-Host "WMIC Failed or no CPU:`n$($_.Exception.Message)" }
                         #endregion
 
-                        #region GPU Info
+                        #region GPU Info (FAILS TO FAIL WHEN PC IS AVAILABLE, requires more robust error handling try/catch isn't enough)
                         try {
                             $rawGPUInfo = wmic /node:"$mainIP" path Win32_VideoController get Name,DeviceID,AdapterRAM,DriverVersion,VideoProcessor,Status /format:list
                             $gpulines = $rawGPUInfo -split "`n" | Select-Object -Skip 2 | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
