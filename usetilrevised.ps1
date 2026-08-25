@@ -118,14 +118,15 @@ function Check-Status {
     }
 }
 
-    # Config file creator and manager (for special actions)
+    # Config file creator and manager (for special actions) ~EDIT~
 function Invoke-Config {
     if (-not (Test-Path $configFile)) {
         try {
             Write-Host "Config.txt is being created in $tempFile"
             $tempStatus = New-Item -Path "$tempFile" -ItemType Directory -Force -ErrorAction SilentlyContinue
             New-Item -Path "$configFile" -ItemType File -ErrorAction Stop
-            "Debug: True`nAD-Capability Check: True" | Out-File -FilePath $configFile -Append
+
+            "Debug: True`nOU_Containment: True"| Out-File -FilePath $configFile -Append
             $successful = $true
         } catch {
             $tempStatus,"`n"; $_.Exception; "`nDepending on the error, you may need to create the 'C:\Temp' folder"
@@ -134,11 +135,19 @@ function Invoke-Config {
     } else {
         do {
             Get-Content -Path $configFile
-            Write-Host "`nA - Toggle Debug | S - Toggle AD RSAT checker | E - Exit"
+            
+                # The config UI ~EDIT~
+            Write-Host @"
+`n A - Toggle Debug
+`n B - Break OU Containment
+`n E - Exit`n
+"@
             $choice = $Host.UI.RawUI.ReadKey("IncludeKeyDown,NoEcho").Character
-            if ($choice -ieq "a") { Toggle-Setting -settingName "Debug" }
-            elseif ($choice -ieq "s") { Toggle-Setting -settingName "AD-Capability Check" }
             Clear-Host
+            switch ($choice) {
+                {$_ -in "a"} { Toggle-Setting -settingName "Debug" }
+                {$_ -in "b"} { Toggle-Setting -settingName "OU_Containment" }
+            }
         } while ($choice -notcontains 'e')
     }
 }
@@ -164,27 +173,7 @@ function Get-IP {
     # Search the local active directory's computer descriptions (Needs redo)
 function AD-Scan {
     while ($true) {
-            # If $configFile exists, $adCheck will be determined by the status of AD-Capability Check. Otherwise default to $adCheck = $true
-            # If RSAT Active Directory Tools are not installed, try installing and importing them, catching and ending if it fails
-        $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Checking RSAT AD Tools status..."; $host.UI.RawUI.ForegroundColor = $orig_fg_color
-            # If the configfile exists, check its AD-Capability Check status and then run the ADCheck if so
-        if (-not (Test-Path $configFile)) { $adCheck = $true } else { $checkStat = $true }
-        if ($checkStat) { if ((Check-Status -settingName "AD-Capability Check") -contains "True") { $adCheck = $true }}
-            if ($adCheck) {
-                $capability = Get-Module -ListAvailable | Where-Object {$_.Name -eq 'ActiveDirectory'}
-                if ($capability.Name -notcontains "ActiveDirectory") {
-                    try {
-                        $rsatError = $false
-                        Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
-                        Import-Module ActiveDirectory; $global:skipNext = $true
-                    } catch { 
-                        $host.UI.RawUI.ForegroundColor = "Red"
-                        Write-Host "Active Directory Tools are not installed..."
-                        $host.UI.RawUI.ForegroundColor = $orig_fg_color
-                        $error = $true; $errorInfo = $_.Exception; break }
-                } else { Import-Module ActiveDirectory; $global:skipNext = $true }
-            }
-        Clear-Host
+        try { Import-Module ActiveDirectory -ErrorAction Stop } catch { Write-Error "Failed to import active directory modules"; Return }
 
         $global:dcIP = (Resolve-DnsName -Name (Get-ADDomainController).HostName | Select-Object -ExpandProperty IPAddress).ToString()
 
@@ -222,8 +211,10 @@ function AD-Scan {
             [System.Console]::Clear(); break
         } else { [System.Console]::Clear() }
         $input = $input -replace "'", ""
-        $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description
-   
+        if (!(Check-Status OU_Containment)) {
+        $result = Get-ADComputer -Filter "Description -like '*$input*'" -SearchBase "OU=Computers,OU=PWL,OU=Quanta Subsidiaries,DC=quantaservices,DC=local" -Properties Description
+        } else { $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description }
+
         $host.UI.RawUI.ForegroundColor = "Yellow"
         Write-Host "Showing results for $input`n"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
