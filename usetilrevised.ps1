@@ -54,7 +54,7 @@ https://github.com/coredmo/Powershell-ISE---ScriptEnder`n
 #You should have C:\Temp\UsetilHTTP\server.js available for use
 
 Write-Host "Press enter to return..."
-$noid = Read-Host -Debug; Clear-Host
+$noid = Read-Host; Clear-Host;
 if ($noid -ieq "dingus") { Start-Process "https://cat-bounce.com/" } elseif ($noid -ieq " ") { Write-Host "dingus" }
 }
 
@@ -114,7 +114,7 @@ function Check-Status {
     if ($config.ContainsKey($settingName)) {
         "$($config[$settingName])"
     } else {
-        "Setting '$settingName' not found."
+        "Setting '$settingName' not found.`n"
     }
 }
 
@@ -128,6 +128,7 @@ function Invoke-Config {
 
             "Debug: True`nOU_Containment: True"| Out-File -FilePath $configFile -Append
             $successful = $true
+
         } catch {
             $tempStatus,"`n"; $_.Exception; "`nDepending on the error, you may need to create the 'C:\Temp' folder"
         }
@@ -194,22 +195,23 @@ function AD-Scan {
         Clear-Host
     }
 
-    if ($error -eq $true) { Return }
-
-    while ($true) {
+    while ($true -and $error -ne $true) {
             # adRecents is enabled if you have previously saved a unitList (Recents list)
         if ($adRecents -and $recents.Count -gt 0) { 
-            $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "Recent Results:`n $recents"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            $host.UI.RawUI.ForegroundColor = "Yellow"
+            Write-Host "Recent Results:`n $recents"
+            $host.UI.RawUI.ForegroundColor = $orig_fg_color
         }
         
         if (-not $parameter) { 
             Write-Host "You can press 'c' while its querying to abort the process`n"
-            $input = Read-Host "- Enter any piece of a pc's active directory description or leave it blank to return to the console -`n>"
-        }
-        else { $input = $parameter }
+            $input = Read-Host "- Enter any piece of a user's name or leave it blank to return to the console -`n>"
+        } else { $input = $parameter }
+
         if (-not $input) {
             [System.Console]::Clear(); break
         } else { [System.Console]::Clear() }
+
         $input = $input -replace "'", ""
         if (!(Check-Status OU_Containment)) {
         $result = Get-ADComputer -Filter "Description -like '*$input*'" -SearchBase "OU=Computers,OU=PWL,OU=Quanta Subsidiaries,DC=quantaservices,DC=local" -Properties Description
