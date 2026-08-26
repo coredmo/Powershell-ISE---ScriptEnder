@@ -195,7 +195,7 @@ function AD-Scan {
         Clear-Host
     }
 
-    while ($true -and $error -ne $true) {
+    while ($true) {
             # adRecents is enabled if you have previously saved a unitList (Recents list)
         if ($adRecents -and $recents.Count -gt 0) { 
             $host.UI.RawUI.ForegroundColor = "Yellow"
@@ -204,21 +204,25 @@ function AD-Scan {
         }
         
         if (-not $parameter) { 
-            Write-Host "You can press 'c' while its querying to abort the process`n"
-            $input = Read-Host "- Enter any piece of a user's name or leave it blank to return to the console -`n>"
-        } else { $input = $parameter }
+            $searchInput = Read-Host "- Enter any piece of a user's name or leave it blank to return to the console -`n>"
+        } else { $searchInput = $parameter }
 
-        if (-not $input) {
+        if (-not $searchInput) {
             [System.Console]::Clear(); break
         } else { [System.Console]::Clear() }
 
-        $input = $input -replace "'", ""
-        if (!(Check-Status OU_Containment)) {
-        $result = Get-ADComputer -Filter "Description -like '*$input*'" -SearchBase "OU=Computers,OU=PWL,OU=Quanta Subsidiaries,DC=quantaservices,DC=local" -Properties Description
-        } else { $result = Get-ADComputer -Filter "Description -like '*$input*'" -Properties Description }
+        $searchInput = $searchInput -replace "'", ""
+        if (Test-Path -Path "C:/Temp/usetilconfig.txt") {
+            if (Check-Status OU_Containment) {
+            $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "OU Containment Enabled"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            $result = Get-ADComputer -Filter "Description -like '*$searchInput*'" -SearchBase "OU=Computers,OU=PWL,OU=Quanta Subsidiaries,DC=quantaservices,DC=local" -Properties Description
+            } else {
+            $host.UI.RawUI.ForegroundColor = "Yellow"; Write-Host "OU Containment Disabled"; $host.UI.RawUI.ForegroundColor = $orig_fg_color
+            $result = Get-ADComputer -Filter "Description -like '*$searchInput*'" -Properties Description }
+        } else { Write-Host "No usetil config detected, OU containment is disabled"; $result = Get-ADComputer -Filter "Description -like '*$searchInput*'" -Properties Description }
 
         $host.UI.RawUI.ForegroundColor = "Yellow"
-        Write-Host "Showing results for $input`n"
+        Write-Host "Showing results for $searchInput`nYou can press 'c' while its querying to abort the process`n"
         $host.UI.RawUI.ForegroundColor = $orig_fg_color
         
             # Initialize a recents list
@@ -281,7 +285,7 @@ function AD-Scan {
                     "----------------------------"
             }
         } else {
-            Write-Host "No results found for $input`n"
+            Write-Host "No results found for $searchInput`n"
         }
             # Press C to exit Scan-Create, press S to save the newly made $unitList as $recents, any other key just resets the search
             # (if $unitList is empty, make $recents = $null)
@@ -309,7 +313,7 @@ function Invoke-Recents {
 
                 $result = Get-ADComputer -Identity "$unitName" -Properties Description | Select-Object Name,Description
 
-                $macResult = arp -a | findstr "$unitIP"
+                #$macResult = arp -a | findstr "$unitIP"
                 
                 if ($macResult -eq $null -or $macResult -eq '') {
                     $host.UI.RawUI.ForegroundColor = "Yellow"
